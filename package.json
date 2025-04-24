@@ -1,0 +1,16 @@
+{
+  "name": "vercel-http-proxy",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "vercel-dev": "vercel dev",
+    "vercel-deploy": "vercel deploy --prod"
+  },
+  "dependencies": {
+    "axios": "^1.8.4"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.2.29",
+    "typescript": "^5.8.3"
+  }
+}
