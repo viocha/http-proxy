@@ -158,7 +158,7 @@
       const result = {
         status:res.status,
         statusText:res.statusText,
-        headers:res.headers,
+        headers:Object.fromEntries(res.headers.entries()),
         data:responseData,
       };
 
