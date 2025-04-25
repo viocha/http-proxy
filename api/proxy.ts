@@ -8,8 +8,8 @@ export default async function handler(req: Request): Promise<Response> {
     // 设置 CORS 头部
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': '*',
+        'Access-Control-Allow-Headers': '*',
     };
 
     // 处理 OPTIONS 请求
@@ -36,8 +36,8 @@ export default async function handler(req: Request): Promise<Response> {
             })
         }
 
-        // 不能带有请求体的方法
-        if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+        // fetch不能带有请求体的方法
+        if (['GET', 'HEAD'].includes(method)) {
             data = null;
         }
 
@@ -46,7 +46,7 @@ export default async function handler(req: Request): Promise<Response> {
             method,
             headers,
             body: data,
-        });
+        })
     } catch (error: any) { // 错误处理
         return Response.json({error: error.message}, {
             status: 500,

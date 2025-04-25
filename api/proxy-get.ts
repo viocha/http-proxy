@@ -8,8 +8,8 @@ export default async function handler(req: Request): Promise<Response> {
     // 设置 CORS 头部
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': '*',
+        'Access-Control-Allow-Headers': '*',
     };
 
     // 处理 OPTIONS 请求
