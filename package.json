@@ -8,11 +8,5 @@
     "vercel-deploy": "vercel deploy --prod",
     "push": "git push",
     "commit-push": "git add . && git commit -m 'update' && git push"
-  },
-  "dependencies": {
-  },
-  "devDependencies": {
-    "@vercel/node": "^5.1.14",
-    "typescript": "^5.8.3"
   }
 }
