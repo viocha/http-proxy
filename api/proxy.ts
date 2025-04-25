@@ -1,42 +1,56 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import axios from 'axios';
+// /api/proxy.ts
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export const config = {
+    runtime: 'edge', // 指定这是一个 Edge Function
+};
 
+export default async function handler(req: Request): Promise<Response> {
+    // 设置 CORS 头部
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    };
+
+    // 处理 OPTIONS 请求
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        return new Response(null, {status: 204, headers: corsHeaders});
     }
 
+    // 处理非 POST 请求
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    const { url, method = 'GET', headers = {}, data = null } = req.body;
-
-    if (!url) {
-        return res.status(400).json({ error: 'Missing url in request body' });
+        return Response.json({error: 'Method not allowed',}, {
+            status: 405,
+            headers: corsHeaders,
+        })
     }
 
     try {
-        const response = await axios({
-            url,
+        // 获取请求体
+        let {url, method = 'GET', headers = {}, data = null} = await req.json()
+
+        if (!url) {
+            return Response.json({error: 'Missing url in request body'}, {
+                status: 400,
+                headers: corsHeaders,
+            })
+        }
+
+        // 不能带有请求体的方法
+        if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+            data = null;
+        }
+
+        // 使用 fetch 进行请求
+        return await fetch(url, {
             method,
             headers,
-            data,
+            body: data,
         });
-        return res.status(200).json({
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-            data: response.data,
-        });
-    } catch (error: any) {
-        return res.status(500).json({
-            error: error.message,
-            response: error.response?.data || null,
+    } catch (error: any) { // 错误处理
+        return Response.json({error: error.message}, {
+            status: 500,
+            headers: corsHeaders,
         });
     }
 }
