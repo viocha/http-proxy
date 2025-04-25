@@ -3,14 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "vercel-dev": "vercel dev",
+    "vercel-dev": "vercel dev --debug",
     "vercel-deploy": "vercel deploy --prod"
   },
   "dependencies": {
-    "axios": "^1.8.4"
   },
   "devDependencies": {
-    "@vercel/node": "^3.2.29",
+    "@vercel/node": "^5.1.14",
     "typescript": "^5.8.3"
   }
 }
