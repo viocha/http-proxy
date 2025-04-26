@@ -7,6 +7,6 @@
     "vercel-preview": "vercel deploy",
     "vercel-deploy": "vercel deploy --prod",
     "push": "git push",
-    "commit-push": "git add . ; git commit -m 'update' ; git push"
+    "commit-push": "git add .; git commit -m 'update'; git push"
   }
 }
