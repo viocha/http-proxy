@@ -85,12 +85,6 @@ export default async function handler(req: Request): Promise<Response> {
 			headers: headers,
 			body: body,
 		};
-		// 流式传输请求体时 duplex: 'half' 是必需的
-		if (body) {
-			// @ts-ignore duplex属性是存在的，但是ts会报错
-			fetchOptions.duplex = 'half';
-		}
-
 		const response = await fetch(url, fetchOptions);
 
 		// 准备发送回客户端的响应头，先复制目标服务器的响应头
