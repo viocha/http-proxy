@@ -1,38 +1,16 @@
 // /api/proxy.ts
 
+import {genCorsHeaders} from './_lib/util.js';
+
 export const config = {
 	runtime: 'edge', // 指定这是一个 Edge Function
 };
 
-export const AllowedHeaders = 'X-Url, X-Method, Accept, Accept-Encoding, Accept-Language, Authorization,' +
-		' Cache-Control,' +
-		' Content-Disposition, Content-Encoding, Content-Language, Content-Length, Content-Range, Content-Type,' +
-		' Cookie, Date, ETag, Expires, Host, If-Match, If-Modified-Since, If-None-Match, If-Range, If-Unmodified-Since,' +
-		' Last-Modified, Location, Origin, Pragma, Range, Referer, Server, Transfer-Encoding, User-Agent, Vary,' +
-		' X-Requested-With, X-HTTP-Method-Override, X-Forwarded-For, X-Forwarded-Proto, X-Real-IP, X-CSRF-Token,' +
-		' X-Auth-Token, X-API-Key, X-Client-Version, X-Device-ID, X-Session-ID';
-
-
 export default async function handler(req: Request): Promise<Response> {
-	// 设置 CORS 头部
-	const clientOrigin = req.headers.get('Origin');
-	const corsHeaders: Record<string, string> = {
-		'Access-Control-Allow-Methods': 'POST, OPTIONS',
-	};
+	const corsHeaders: Record<string, string> = genCorsHeaders(
+			{request: req, allowMethods: 'POST, OPTIONS'},
+	);
 
-	if (clientOrigin) {
-		corsHeaders['Access-Control-Allow-Origin'] = clientOrigin;
-		corsHeaders['Access-Control-Allow-Credentials'] = 'true';
-		// 当允许凭据时，Access-Control-Allow-Headers 不能为 '*', 会被当成字面量，
-		// 可以反射客户端在 Access-Control-Request-Headers 中请求的头部，或者是一个明确的列表
-		corsHeaders['Access-Control-Allow-Headers'] =
-				req.headers.get('Access-Control-Request-Headers') || AllowedHeaders;
-	} else {
-		// 如果没有 Origin 头部 (例如，非浏览器请求或同源请求)，则允许所有源
-		// 当 Access-Control-Allow-Origin 为 '*' 时，不能允许凭据
-		corsHeaders['Access-Control-Allow-Origin'] = '*';
-		corsHeaders['Access-Control-Allow-Headers'] = '*';
-	}
 
 	// 处理 OPTIONS 预检请求
 	if (req.method === 'OPTIONS') {
@@ -51,7 +29,7 @@ export default async function handler(req: Request): Promise<Response> {
 		// 从自定义头部获取目标 URL 和方法
 		const url = req.headers.get('X-Url');
 		const method = req.headers.get('X-Method')?.toUpperCase() || 'GET';
-		const manualRedirect = req.headers.get('X-Redirect')?.toLowerCase() === 'manual';
+		const redirect = (req.headers.get('X-Redirect')?.toLowerCase() || 'follow') as RequestRedirect;
 
 		if (!url) {
 			return Response.json({error: 'Missing X-Url in request headers'}, {
@@ -73,51 +51,44 @@ export default async function handler(req: Request): Promise<Response> {
 
 		// 只有当方法不是 GET 或 HEAD，并且请求体存在时，才转发请求体
 		let body: BodyInit | null = null;
-		if (method !== 'GET' && method !== 'HEAD' && req.body) {
-			// 防止重定向导致错误：A request with a one-time-use body (it was initialized from a stream, not a buffer)
-			// encountered a redirect requiring the body to be retransmitted.
-			body = await req.arrayBuffer();
-		} else {
+		if (method === 'GET' || method === 'HEAD') { // 不能携带请求体的方法
 			headers.delete('Content-Length'); // content-length和body长度不匹配fetch会报错
+		} else {
+			if (req.body) {
+				body = await req.arrayBuffer(); // 防止fetch重定向导致错误
+			}
 		}
 
 		// 使用 fetch 向目标 URL 发起请求
-		const fetchOptions: RequestInit = {
-			method: method,
-			headers: headers,
-			body: body,
-		};
-		if (manualRedirect) {
-			fetchOptions.redirect = 'manual'; // 手动处理重定向
-		}
+		const response = await fetch(url, {
+			method,
+			headers,
+			body,
+			redirect,
+		});
 
-		const response = await fetch(url, fetchOptions);
-
-		// 准备发送回客户端的响应头，先复制目标服务器的响应头
-		// 然后应用代理服务器的 CORS 策略
+		// 先复制目标服务器的响应头，然后应用代理服务器的 CORS 策略
 		const respHeaders = new Headers(response.headers);
 		Object.entries(corsHeaders).forEach(([key, value]) => {
 			respHeaders.set(key, value);
 		});
 
 		// 如果是手动处理重定向，且响应码是3xx，则将响应码修改为2xx
-		if (manualRedirect && response.status >= 300 && response.status < 400) {
+		if (redirect && response.status >= 300 && response.status < 400) {
 			respHeaders.set('X-Redirect-Status', String(response.status));
 			respHeaders.set('X-Redirect-Location', response.headers.get('Location') || '');
 			return new Response(null, {
 				status: 200,
-				statusText: 'Manual Redirect',
 				headers: respHeaders,
 			});
 		}
 
-		// 将目标服务器的响应体和处理过的头部返回给客户端
+		// 返回正常的响应
 		return new Response(response.body, {
 			status: response.status,
 			statusText: response.statusText,
 			headers: respHeaders,
 		});
-
 	} catch (error: any) {
 		console.error('Proxy error:', error);
 		return Response.json({error: 'Proxy error: ' + error.message}, {

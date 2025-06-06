@@ -1,27 +1,15 @@
 // /api/get.ts
 
-import {AllowedHeaders} from './proxy.js';
+import {genCorsHeaders} from './_lib/util.js';
 
 export const config = {
 	runtime: 'edge', // 指定这是一个 Edge Function
 };
 
 export default async function handler(req: Request): Promise<Response> {
-	// 设置 CORS 头部
-	const clientOrigin = req.headers.get('Origin');
-	const corsHeaders: Record<string, string> = {
-		'Access-Control-Allow-Methods': 'GET, OPTIONS',
-	};
-
-	if (clientOrigin) {
-		corsHeaders['Access-Control-Allow-Origin'] = clientOrigin;
-		corsHeaders['Access-Control-Allow-Credentials'] = 'true';
-		corsHeaders['Access-Control-Allow-Headers'] =
-				req.headers.get('Access-Control-Request-Headers') || AllowedHeaders;
-	} else {
-		corsHeaders['Access-Control-Allow-Origin'] = '*';
-		corsHeaders['Access-Control-Allow-Headers'] = '*';
-	}
+	const corsHeaders: Record<string, string> = genCorsHeaders(
+			{request: req, allowMethods: 'GET, OPTIONS'},
+	);
 
 	// 处理 OPTIONS 预检请求
 	if (req.method === 'OPTIONS') {
@@ -47,18 +35,12 @@ export default async function handler(req: Request): Promise<Response> {
 			});
 		}
 
-		// 准备转发到 /api/proxy 的请求头
-		const headers = new Headers();
-		req.headers.forEach((value, key) => {
-				headers.append(key, value);
-		});
-
-		// 设置代理目标和方法
+		// 准备转发到 /api/proxy 的请求头，设置代理目标和方法
+		const headers = new Headers(req.headers);
 		headers.set('X-Url', targetUrl);
 		headers.set('X-Method', 'GET'); // 明确指定目标方法为 GET
 
-		// 构造到 /api/proxy 的请求 URL
-		// 使用 reqUrl.origin 来确保协议、主机和端口正确
+		// 构造到 /api/proxy 的请求 URL，使用 reqUrl.origin 来确保协议、主机和端口正确
 		const proxyEndpointUrl = new URL('/api/proxy', reqUrl.origin).toString();
 
 		return await fetch(proxyEndpointUrl, {
