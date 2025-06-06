@@ -72,7 +72,9 @@ export default async function handler(req: Request): Promise<Response> {
 		// 只有当方法不是 GET 或 HEAD，并且请求体存在时，才转发请求体
 		let body: BodyInit | null = null;
 		if (method !== 'GET' && method !== 'HEAD' && req.body) {
-			body = req.body;
+			// 防止重定向导致错误：A request with a one-time-use body (it was initialized from a stream, not a buffer)
+			// encountered a redirect requiring the body to be retransmitted.
+			body = await req.arrayBuffer();
 		} else {
 			headers.delete('Content-Length'); // content-length和body长度不匹配fetch会报错
 		}
