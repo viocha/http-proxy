@@ -130,9 +130,9 @@
   async function sendRequest(){
     const url = document.getElementById('url').value.trim();
     const method = document.getElementById('method').value;
-    const headerString = document.getElementById('headers').value.trim() || '{}';
-    const headers = eval(`(${headerString})`);
-    const data = document.getElementById('body').value.trim() || null;
+    const headerStr = document.getElementById('headers').value.trim() || '{}';
+    const headers = eval(`(${headerStr})`);
+    const body = document.getElementById('body').value.trim() || null;
 
     const responseBox = document.getElementById('response');
     responseBox.textContent = '请求中...';
@@ -145,7 +145,7 @@
           url,
           method,
           headers,
-          data,
+          body,
         }),
       });
       let responseData;
@@ -159,7 +159,7 @@
         status:res.status,
         statusText:res.statusText,
         headers:Object.fromEntries(res.headers.entries()),
-        data:responseData,
+        body:responseData,
       };
 
       responseBox.textContent = JSON.stringify(result, null, 2);
