@@ -1,172 +1,429 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>HTTP Proxy 工具</title>
-<style>
-  * {
-    box-sizing : border-box;
-  }
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@babel/standalone"></script>
+<!-- 必须导入React和ReactDOM -->
+<script data-type="module" type="text/babel">
+	import {createRoot} from 'https://esm.sh/react-dom@19/client';
+	import React, { useState, useEffect, useCallback } from 'https://esm.sh/react@19';
 
-  body {
-    font-family      : -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color : #f0f2f5;
-    margin           : 0;
-    padding          : 2rem;
-    color            : #333;
-  }
+	function App() {
+		const [method, setMethod] = useState('GET'); // Default to GET
+		const [url, setUrl] = useState('https://httpbin.org/get'); // Default to GET example URL
+		const [headers, setHeaders] = useState([{ id: Date.now(), name: 'Accept', value: 'application/json' }]); // No default Content-Type
+		const [bodyType, setBodyType] = useState('none'); // 'none', 'json', 'form', 'multipart', 'binary'
+		const [jsonBody, setJsonBody] = useState('');
+		const [formBody, setFormBody] = useState([{ id: Date.now(), name: '', value: '' }]);
+		const [multipartBody, setMultipartBody] = useState([{ id: Date.now(), name: '', value: '', type: 'text', file: null }]);
+		const [binaryFile, setBinaryFile] = useState(null);
+		const [response, setResponse] = useState('等待请求... GET 示例已加载。'); // Updated initial message
+		const [isLoading, setIsLoading] = useState(false);
 
-  .container {
-    max-width     : 800px;
-    margin        : auto;
-    background    : white;
-    padding       : 2rem;
-    border-radius : 12px;
-    box-shadow    : 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
+		const exampleRequests = [
+			{
+				name: "GET 示例 (httpbin.org/get)",
+				method: "GET",
+				url: "https://httpbin.org/get",
+				headers: [{ name: "Accept", value: "application/json" }],
+				bodyType: "none", jsonBody: "", formBody: [], multipartBody: [], binaryFile: null
+			},
+			{
+				name: "JSON POST 示例 (httpbin.org/post)",
+				method: "POST",
+				url: "https://httpbin.org/post",
+				headers: [{ name: "X-Custom-Header", value: "ReactProxyTest"}], // Content-Type will be auto-added
+				bodyType: "json",
+				jsonBody: JSON.stringify({ query: "React Proxy", items: [ {id:1, name:"item1"}, {id:2, name:"item2"}] }, null, 2),
+				formBody: [], multipartBody: [], binaryFile: null
+			},
+			{
+				name: "Form POST 示例 (httpbin.org/post)",
+				method: "POST",
+				url: "https://httpbin.org/post",
+				headers: [], // Content-Type will be auto-added
+				bodyType: "form",
+				jsonBody: "",
+				formBody: [{name: "username", value: "testUser"}, {name: "action", value: "submit"}],
+				multipartBody: [], binaryFile: null
+			},
+            {
+				name: "Multipart POST 示例 (httpbin.org/post)",
+				method: "POST",
+				url: "https://httpbin.org/post",
+				headers: [], // Content-Type will be set by browser for FormData
+				bodyType: "multipart",
+				jsonBody: "",
+				formBody: [],
+				multipartBody: [{name: "textParam", value: "Hello Multipart", type: 'text', file: null}, {name: "fileParam", value: "", type: 'file', file: null /* User will select a file */}],
+                binaryFile: null
+			},
+            {
+                name: "Binary File POST 示例 (httpbin.org/post)",
+                method: "POST",
+                url: "https://httpbin.org/post",
+                headers: [], // Content-Type will be auto-detected from file or set to octet-stream
+                bodyType: "binary",
+                jsonBody: "", formBody: [], multipartBody: [], binaryFile: null /* User will select a file */
+            }
+		];
 
-  h1 {
-    font-size     : 1.8rem;
-    margin-bottom : 1.5rem;
-    text-align    : center;
-  }
+		const loadExample = useCallback((example) => {
+			setMethod(example.method);
+			setUrl(example.url);
+			setHeaders(example.headers.map(h => ({ ...h, id: Date.now() + Math.random() * 1000 })));
+			setBodyType(example.bodyType);
+			setJsonBody(example.jsonBody || "");
+			setFormBody(example.formBody?.map(f => ({ ...f, id: Date.now() + Math.random() * 1000 })) || [{ id: Date.now(), name: '', value: '' }]);
+			setMultipartBody(example.multipartBody?.map(m => ({ ...m, id: Date.now() + Math.random() * 1000, file: null })) || [{ id: Date.now(), name: '', value: '', type: 'text', file: null }]);
+			setBinaryFile(null); // Reset binary file on example load
+			setResponse('示例已加载。配置完成后，请点击“发送请求”。');
+		}, []); // Empty dependency array as setX functions are stable
 
-  label {
-    display       : block;
-    margin-top    : 1rem;
-    font-weight   : 600;
-    margin-bottom : 0.3rem;
-  }
+        useEffect(() => {
+            const defaultExample = exampleRequests.find(ex => ex.name === "GET 示例 (httpbin.org/get)");
+            if (defaultExample) {
+                loadExample(defaultExample);
+            }
+        }, [loadExample]); // Add loadExample to dependency array because it's defined outside useEffect
 
-  input, select, textarea {
-    width         : 100%;
-    padding       : 0.6rem;
-    border        : 1px solid #ccc;
-    border-radius : 6px;
-    font-family   : monospace;
-    font-size     : 0.95rem;
-  }
+		const addHeader = () => setHeaders([...headers, { id: Date.now(), name: '', value: '' }]);
+		const removeHeader = (id) => setHeaders(headers.filter(h => h.id !== id));
+		const updateHeader = (id, field, value) => {
+			setHeaders(headers.map(h => h.id === id ? { ...h, [field]: value } : h));
+		};
 
-  textarea {
-    resize : vertical;
-  }
+		const addFormParam = () => setFormBody([...formBody, { id: Date.now(), name: '', value: '' }]);
+		const removeFormParam = (id) => setFormBody(formBody.filter(p => p.id !== id));
+		const updateFormParam = (id, field, value) => {
+			setFormBody(formBody.map(p => p.id === id ? { ...p, [field]: value } : p));
+		};
 
-  button {
-    display          : block;
-    width            : 100%;
-    margin-top       : 1.5rem;
-    padding          : 0.8rem;
-    font-size        : 1rem;
-    color            : white;
-    background-color : #007bff;
-    border           : none;
-    border-radius    : 6px;
-    cursor           : pointer;
-    transition       : background-color 0.2s;
-  }
+		const addMultipartParam = () => setMultipartBody([...multipartBody, { id: Date.now(), name: '', value: '', type: 'text', file: null }]);
+		const removeMultipartParam = (id) => setMultipartBody(multipartBody.filter(p => p.id !== id));
+		const updateMultipartParam = (id, field, value) => {
+			setMultipartBody(multipartBody.map(p => p.id === id ? { ...p, [field]: value } : p));
+		};
+		const handleMultipartFileTypeChange = (id, type) => {
+			 setMultipartBody(multipartBody.map(p => p.id === id ? { ...p, type: type, value: type === 'file' ? (p.file ? p.file.name : '') : p.value , file: type === 'text' ? null : p.file } : p));
+		};
+		const handleMultipartFileChange = (id, file) => {
+			setMultipartBody(multipartBody.map(p => p.id === id ? { ...p, file: file, value: file ? file.name : '' } : p));
+		};
 
-  button:hover {
-    background-color : #0056b3;
-  }
+		const handleSendRequest = async () => {
+			setIsLoading(true);
+			setResponse('请求中...');
 
-  h2 {
-    margin-top     : 2rem;
-    font-size      : 1.4rem;
-    border-bottom  : 1px solid #eee;
-    padding-bottom : 0.5rem;
-  }
+			if (!url) {
+				setResponse('错误: 目标 URL 不能为空。');
+				setIsLoading(false);
+				return;
+			}
 
-  pre {
-    background    : #f8f8f8;
-    padding       : 1rem;
-    border-radius : 8px;
-    overflow-x    : auto;
-    white-space   : pre-wrap;
-    word-wrap     : break-word;
-  }
-</style>
+			const requestHeaders = new Headers();
+			requestHeaders.set('X-Url', url);
+			requestHeaders.set('X-Method', method);
+
+			let hasUserContentType = false;
+			headers.forEach(h => {
+				if (h.name && h.value) {
+					requestHeaders.set(h.name, h.value);
+					if (h.name.toLowerCase() === 'content-type') {
+						hasUserContentType = true;
+					}
+				}
+			});
+
+			let bodyToSend = null;
+			let autoContentType = null;
+
+			if (method !== 'GET' && method !== 'HEAD') {
+				switch (bodyType) {
+					case 'json':
+						bodyToSend = jsonBody;
+						autoContentType = 'application/json; charset=utf-8';
+						break;
+					case 'form':
+						const params = new URLSearchParams();
+						formBody.forEach(p => {
+							if (p.name) params.append(p.name, p.value);
+						});
+						bodyToSend = params;
+						autoContentType = 'application/x-www-form-urlencoded; charset=utf-8';
+						break;
+					case 'multipart':
+						const formData = new FormData();
+						multipartBody.forEach(p => {
+							if (p.name) {
+								if (p.type === 'file' && p.file) {
+									formData.append(p.name, p.file, p.file.name);
+								} else if (p.type === 'text') {
+									formData.append(p.name, p.value);
+								}
+							}
+						});
+						bodyToSend = formData;
+						// For FormData, browser sets Content-Type with boundary, so don't set it here.
+						autoContentType = null;
+						break;
+					case 'binary':
+						bodyToSend = binaryFile;
+						if (binaryFile) {
+							autoContentType = binaryFile.type || 'application/octet-stream';
+						}
+						break;
+					case 'none':
+					default:
+						bodyToSend = null;
+						break;
+				}
+			}
+
+			if (autoContentType && !hasUserContentType) {
+				requestHeaders.set('Content-Type', autoContentType);
+			}
+            // If bodyToSend is FormData, delete Content-Type header if user set it, as browser needs to set it with boundary
+            if (bodyToSend instanceof FormData && hasUserContentType) {
+                const userContentTypeHeader = headers.find(h => h.name.toLowerCase() === 'content-type');
+                if (userContentTypeHeader) {
+                    requestHeaders.delete(userContentTypeHeader.name); // remove user-set C-T for FormData
+                }
+            }
+
+            // If bodyToSend is null (e.g. for GET, or empty body types), and user hasn't set Content-Length,
+            // ensure it's not present or is 0 if method expects a body but it's empty.
+            // Fetch handles Content-Length for FormData and Blob/File correctly.
+            // For string or URLSearchParams, it also usually does.
+            // If bodyToSend is null for POST/PUT etc., Content-Length should be 0.
+            if (bodyToSend === null && method !== 'GET' && method !== 'HEAD' && !requestHeaders.has('Content-Length')) {
+                 // requestHeaders.set('Content-Length', '0'); // Some servers might require this. Fetch might handle it.
+            }
+
+
+			try {
+				const res = await fetch('/api/proxy', {
+					method: 'POST', // Always POST to the proxy endpoint
+					headers: requestHeaders,
+					body: bodyToSend,
+				});
+
+				const responseHeaders = {};
+				res.headers.forEach((value, key) => {
+					responseHeaders[key] = value;
+				});
+
+				let responseBodyContent;
+				const respContentType = res.headers.get('content-type');
+				if (respContentType?.includes('application/json')) {
+					responseBodyContent = await res.json();
+				} else if (respContentType?.includes('text/') || respContentType?.includes('application/xml') || respContentType?.includes('application/javascript')) {
+					responseBodyContent = await res.text();
+				} else if (res.body) {
+                    // Attempt to read as blob and provide info, or indicate unrenderable
+                    try {
+                        const blob = await res.blob();
+                        responseBodyContent = `[Binary data: ${blob.size} bytes, Type: ${blob.type || 'unknown'}. Cannot display content directly.]`;
+                         // One could add a download link here if needed
+                    } catch (e) {
+                         responseBodyContent = "[Response body exists but could not be read or displayed]";
+                    }
+				} else {
+                    responseBodyContent = "[No response body]";
+                }
+
+				const result = {
+					status: res.status,
+					statusText: res.statusText,
+					headers: responseHeaders,
+					body: responseBodyContent,
+				};
+				setResponse(JSON.stringify(result, null, 2));
+
+			} catch (err) {
+				console.error("Request failed:", err);
+				setResponse('请求失败:\n' + (err.message || String(err)));
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		return (
+			<div className="container mx-auto p-4 max-w-5xl bg-gray-50 min-h-screen">
+				<h1 className="text-center text-3xl font-bold text-indigo-700 my-6">
+					HTTP 代理工具
+				</h1>
+
+				<div className="mb-8 p-6 bg-white shadow-xl rounded-lg">
+					<label htmlFor="examples" className="block text-md font-semibold text-gray-800 mb-2">加载预设示例:</label>
+					<select
+						id="examples"
+						onChange={(e) => {
+							const selectedExample = exampleRequests.find(ex => ex.name === e.target.value);
+							if (selectedExample) loadExample(selectedExample);
+						}}
+						className="mt-1 block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
+					>
+						<option value="">选择一个示例...</option>
+						{exampleRequests.map(ex => <option key={ex.name} value={ex.name}>{ex.name}</option>)}
+					</select>
+				</div>
+
+				<div className="space-y-8 bg-white p-6 shadow-xl rounded-lg">
+					{/* Method and URL */}
+					<div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+						<div className="md:col-span-1">
+							<label htmlFor="method" className="block text-sm font-medium text-gray-700">请求方式:</label>
+							<select id="method" value={method} onChange={e => setMethod(e.target.value)}
+									className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+								<option>GET</option>
+								<option>POST</option>
+								<option>PUT</option>
+								<option>PATCH</option>
+								<option>DELETE</option>
+								<option>OPTIONS</option>
+								<option>HEAD</option>
+							</select>
+						</div>
+						<div className="md:col-span-3">
+							<label htmlFor="url" className="block text-sm font-medium text-gray-700">目标 URL:</label>
+							<input type="text" id="url" value={url} onChange={e => setUrl(e.target.value)}
+								   className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"
+								   placeholder="例如: https://api.example.com/data"/>
+						</div>
+					</div>
+
+					{/* Headers */}
+					<div>
+						<h3 className="text-xl font-semibold text-gray-800 mb-3">请求 Headers</h3>
+						<div className="space-y-2">
+						{headers.map((header, index) => (
+							<div key={header.id} className="flex items-center space-x-2">
+								<input type="text" placeholder="Header Name" value={header.name}
+									   onChange={e => updateHeader(header.id, 'name', e.target.value)}
+									   className="flex-grow shadow-sm sm:text-sm border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"/>
+								<input type="text" placeholder="Header Value" value={header.value}
+									   onChange={e => updateHeader(header.id, 'value', e.target.value)}
+									   className="flex-grow shadow-sm sm:text-sm border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"/>
+								<button onClick={() => removeHeader(header.id)}
+										className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-medium transition-colors">删除</button>
+							</div>
+						))}
+						</div>
+						<button onClick={addHeader}
+								className="mt-3 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-medium transition-colors">
+							添加 Header
+						</button>
+					</div>
+
+					{/* Body */}
+					<div>
+						<h3 className="text-xl font-semibold text-gray-800 mb-3">请求 Body</h3>
+						<div className="flex space-x-1 mb-4 border-b border-gray-200">
+							{['none', 'json', 'form', 'multipart', 'binary'].map(type => (
+								<button key={type} onClick={() => setBodyType(type)}
+										className={`px-4 py-2 text-sm font-medium rounded-t-md focus:outline-none
+											${bodyType === type ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-indigo-100 hover:text-indigo-700'}`}>
+									{type.charAt(0).toUpperCase() + type.slice(1)}
+								</button>
+							))}
+						</div>
+
+						{bodyType === 'none' && (
+							<p className="text-sm text-gray-500 italic p-2">此请求类型通常不发送请求体。</p>
+						)}
+						{bodyType === 'json' && (
+							<textarea value={jsonBody} onChange={e => setJsonBody(e.target.value)} rows="8"
+									  className="w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 font-mono focus:ring-indigo-500 focus:border-indigo-500"
+									  placeholder='例如: {"key": "value", "items": [1,2,3]}'></textarea>
+						)}
+						{bodyType === 'form' && (
+							<div className="space-y-2">
+								{formBody.map((param, index) => (
+									<div key={param.id} className="flex items-center space-x-2">
+										<input type="text" placeholder="Name" value={param.name}
+											   onChange={e => updateFormParam(param.id, 'name', e.target.value)}
+											   className="flex-grow shadow-sm sm:text-sm border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"/>
+										<input type="text" placeholder="Value" value={param.value}
+											   onChange={e => updateFormParam(param.id, 'value', e.target.value)}
+											   className="flex-grow shadow-sm sm:text-sm border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"/>
+										<button onClick={() => removeFormParam(param.id)}
+												className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-medium transition-colors">删除</button>
+									</div>
+								))}
+								<button onClick={addFormParam}
+										className="mt-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-medium transition-colors">
+									添加 Form 参数
+								</button>
+							</div>
+						)}
+						{bodyType === 'multipart' && (
+							<div className="space-y-3">
+								{multipartBody.map((param, index) => (
+									<div key={param.id} className="p-3 border border-gray-200 rounded-md space-y-2">
+                                        <div className="flex items-center space-x-2">
+                                            <input type="text" placeholder="Name" value={param.name}
+                                                onChange={e => updateMultipartParam(param.id, 'name', e.target.value)}
+                                                className="w-1/3 shadow-sm sm:text-sm border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"/>
+                                            <select value={param.type} onChange={(e) => handleMultipartFileTypeChange(param.id, e.target.value)}
+                                                className="p-2 border-gray-300 rounded-md text-sm shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                                <option value="text">Text</option>
+                                                <option value="file">File</option>
+                                            </select>
+                                            <button onClick={() => removeMultipartParam(param.id)}
+                                                    className="ml-auto p-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-medium transition-colors">删除</button>
+                                        </div>
+										{param.type === 'text' ? (
+											<input type="text" placeholder="Value" value={param.value}
+												   onChange={e => updateMultipartParam(param.id, 'value', e.target.value)}
+												   className="w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"/>
+										) : (
+											<input type="file"
+												   onChange={e => handleMultipartFileChange(param.id, e.target.files[0])}
+												   className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"/>
+										)}
+									</div>
+								))}
+								<button onClick={addMultipartParam}
+										className="mt-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-medium transition-colors">
+									添加 Multipart 参数
+								</button>
+							</div>
+						)}
+						{bodyType === 'binary' && (
+							<input type="file" onChange={e => setBinaryFile(e.target.files[0])}
+								   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"/>
+						)}
+					</div>
+
+					{/* Send Button */}
+					<button onClick={handleSendRequest} disabled={isLoading}
+							className="w-full mt-8 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 disabled:bg-gray-400 transition-colors text-lg">
+						{isLoading ? '发送中...' : '发送请求'}
+					</button>
+				</div>
+
+				{/* Response */}
+				<div className="mt-10">
+					<h2 className="text-2xl font-semibold text-gray-800 mb-4">响应结果:</h2>
+					<pre className="bg-gray-900 text-green-300 p-6 rounded-lg shadow-inner overflow-x-auto text-sm whitespace-pre-wrap break-all font-mono leading-relaxed">
+						{response}
+					</pre>
+				</div>
+                <footer class="text-center text-gray-500 text-sm mt-12 pb-8">
+                    HTTP Proxy 工具
+                </footer>
+			</div>
+		);
+	}
+
+	createRoot(document.getElementById('root')).render(<App />);
+</script>
 </head>
 <body>
-<div class="container">
-  <h1>HTTP Proxy 工具</h1>
-
-  <label for="method">请求方式:</label>
-  <select id="method">
-    <option>POST</option>
-    <option>GET</option>
-    <option>PUT</option>
-    <option>PATCH</option>
-    <option>DELETE</option>
-    <option>OPTIONS</option>
-    <option>HEAD</option>
-  </select>
-
-  <label for="url">目标 URL:</label>
-  <input type="text" id="url" value="https://httpbin.org/post"/>
-
-  <label for="headers">请求 Headers (对象字面量或 JSON):</label>
-  <textarea id="headers" rows="4">
-{
-  "Content-Type": "application/json"
-}
-    </textarea>
-
-  <label for="body">请求 Body:</label>
-  <textarea id="body" rows="6">
-{
-  "name": "John",
-  "age": 23
-}
-    </textarea>
-
-  <button onclick="sendRequest()">发送请求</button>
-
-  <h2>响应结果:</h2>
-  <pre id="response">等待请求...</pre>
-</div>
-
-<script>
-  async function sendRequest(){
-    const url = document.getElementById('url').value.trim();
-    const method = document.getElementById('method').value;
-    const headerStr = document.getElementById('headers').value.trim() || '{}';
-    const headers = eval(`(${headerStr})`);
-    const body = document.getElementById('body').value.trim() || null;
-
-    const responseBox = document.getElementById('response');
-    responseBox.textContent = '请求中...';
-
-    try {
-      const res = await fetch('/api/proxy', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          url,
-          method,
-          headers,
-          body,
-        }),
-      });
-      let responseData;
-      if (res.headers.get('Content-Type')?.includes('application/json')){
-        responseData = await res.json();
-      } else {
-        responseData = await res.text();
-      }
-
-      const result = {
-        status:res.status,
-        statusText:res.statusText,
-        headers:Object.fromEntries(res.headers.entries()),
-        body:responseData,
-      };
-
-      responseBox.textContent = JSON.stringify(result, null, 2);
-    } catch (err){
-      responseBox.textContent = '请求失败:\n'+err.message;
-    }
-  }
-</script>
+	<div id="root"></div>
 </body>
 </html>
