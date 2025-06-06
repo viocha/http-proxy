@@ -17,7 +17,7 @@ export default async function handler(req: Request): Promise<Response> {
 	// 设置 CORS 头部
 	const clientOrigin = req.headers.get('Origin');
 	const corsHeaders: Record<string, string> = {
-		'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, HEAD, PATCH',
+		'Access-Control-Allow-Methods': 'POST, OPTIONS',
 	};
 
 	if (clientOrigin) {
@@ -51,6 +51,7 @@ export default async function handler(req: Request): Promise<Response> {
 		// 从自定义头部获取目标 URL 和方法
 		const url = req.headers.get('X-Url');
 		const method = req.headers.get('X-Method')?.toUpperCase() || 'GET';
+		const manualRedirect = req.headers.get('X-Redirect')?.toLowerCase() === 'manual';
 
 		if (!url) {
 			return Response.json({error: 'Missing X-Url in request headers'}, {
@@ -64,9 +65,10 @@ export default async function handler(req: Request): Promise<Response> {
 		req.headers.forEach((value, key) => {
 			const lowerKey = key.toLowerCase();
 			// 过滤掉代理特定的头部和 Host 头部 (fetch 会根据目标 URL 自动设置 Host)
-			if (lowerKey !== 'x-url' && lowerKey !== 'x-method' && lowerKey !== 'host') {
-				headers.append(key, value);
+			if (['host', 'x-url', 'x-method', 'x-redirect'].includes(lowerKey)) {
+				return; // 跳过这些头部
 			}
+			headers.append(key, value);
 		});
 
 		// 只有当方法不是 GET 或 HEAD，并且请求体存在时，才转发请求体
@@ -80,19 +82,34 @@ export default async function handler(req: Request): Promise<Response> {
 		}
 
 		// 使用 fetch 向目标 URL 发起请求
-		const fetchOptions = {
+		const fetchOptions: RequestInit = {
 			method: method,
 			headers: headers,
 			body: body,
 		};
+		if (manualRedirect) {
+			fetchOptions.redirect = 'manual'; // 手动处理重定向
+		}
+
 		const response = await fetch(url, fetchOptions);
 
 		// 准备发送回客户端的响应头，先复制目标服务器的响应头
-		const respHeaders = new Headers(response.headers);
 		// 然后应用代理服务器的 CORS 策略
+		const respHeaders = new Headers(response.headers);
 		Object.entries(corsHeaders).forEach(([key, value]) => {
 			respHeaders.set(key, value);
 		});
+
+		// 如果是手动处理重定向，且响应码是3xx，则将响应码修改为2xx
+		if (manualRedirect && response.status >= 300 && response.status < 400) {
+			respHeaders.set('X-Redirect-Status', String(response.status));
+			respHeaders.set('X-Redirect-Location', response.headers.get('Location') || '');
+			return new Response(null, {
+				status: 200,
+				statusText: 'Manual Redirect',
+				headers: respHeaders,
+			});
+		}
 
 		// 将目标服务器的响应体和处理过的头部返回给客户端
 		return new Response(response.body, {
