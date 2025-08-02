@@ -23,6 +23,7 @@
 		const [response, setResponse] = useState('');
 		const [isLoading, setIsLoading] = useState(false);
 		const [manualRedirect, setManualRedirect] = useState(false);
+		const [useProxy, setUseProxy] = useState(true); // 默认为 true，使用代理
 
 		const exampleRequests = [
 			{
@@ -140,7 +141,7 @@
 			setMultipartBody(multipartBody.map(p=>p.id===id? {...p, file:file, value:file? file.name: ''}: p));
 		};
 
-		const handleSendRequest = async()=>{
+			const handleSendRequest = async()=>{
 			setIsLoading(true);
 			setResponse('请求中...');
 
@@ -150,13 +151,8 @@
 				return;
 			}
 
+			// 构造请求头和请求体，这部分对于代理和直接请求是共用的
 			const requestHeaders = new Headers();
-			requestHeaders.set('X-Url', url);
-			requestHeaders.set('X-Method', method);
-			if (manualRedirect){
-				requestHeaders.set('X-Redirect', 'manual');
-			}
-
 			let hasUserContentType = false;
 			headers.forEach(h=>{
 				if (h.name && h.value){
@@ -198,8 +194,7 @@
 							}
 						});
 						bodyToSend = formData;
-						// For FormData, browser sets Content-Type with boundary, so don't set it here.
-						autoContentType = null;
+						autoContentType = null; // 对于 FormData，浏览器会自动设置 Content-Type
 						break;
 					case 'binary':
 						bodyToSend = binaryFile;
@@ -207,7 +202,6 @@
 							autoContentType = binaryFile.type || 'application/octet-stream';
 						}
 						break;
-					case 'none':
 					default:
 						bodyToSend = null;
 						break;
@@ -217,21 +211,50 @@
 			if (autoContentType && !hasUserContentType){
 				requestHeaders.set('Content-Type', autoContentType);
 			}
-			// If bodyToSend is FormData, delete Content-Type header if user set it, as browser needs to set it with boundary
+			// 如果是 FormData，浏览器需要自己设置 Content-Type 和 boundary，因此删除用户设置的
 			if (bodyToSend instanceof FormData && hasUserContentType){
 				const userContentTypeHeader = headers.find(h=>h.name.toLowerCase()==='content-type');
 				if (userContentTypeHeader){
-					requestHeaders.delete(userContentTypeHeader.name); // remove user-set C-T for FormData
+					requestHeaders.delete(userContentTypeHeader.name);
 				}
 			}
 
 			try {
-				const res = await fetch('/api/proxy', {
-					method:'POST',
-					headers:requestHeaders,
-					body:bodyToSend,
-					redirect:'manual',
-				});
+				let fetchUrl;
+				let fetchOptions;
+
+				if (useProxy){
+					// 使用代理服务器的逻辑
+					const proxyHeaders = new Headers();
+					proxyHeaders.set('X-Url', url);
+					proxyHeaders.set('X-Method', method);
+					if (manualRedirect){
+						proxyHeaders.set('X-Redirect', 'manual');
+					}
+					// 将用户定义的所有header传递给代理
+					requestHeaders.forEach((value, key) => {
+						proxyHeaders.set(key, value);
+					});
+
+					fetchUrl = '/api/proxy';
+					fetchOptions = {
+						method: 'POST', // 对代理的请求总是POST
+						headers: proxyHeaders,
+						body: bodyToSend,
+						redirect: 'manual', // 由代理处理重定向
+					};
+				} else {
+					// 直接请求的逻辑
+					fetchUrl = url;
+					fetchOptions = {
+						method: method,
+						headers: requestHeaders,
+						body: bodyToSend,
+						redirect: manualRedirect ? 'manual' : 'follow',
+					};
+				}
+
+				const res = await fetch(fetchUrl, fetchOptions);
 
 				console.log('Response:', res);
 
@@ -248,12 +271,10 @@
 						|| respContentType?.includes('application/javascript')){
 					responseBodyContent = await res.text();
 				} else if (res.body){
-					// Attempt to read as blob and provide info, or indicate unrenderable
 					try {
 						const blob = await res.blob();
 						responseBodyContent = `[Binary data: ${blob.size} bytes, Type: ${blob.type
 						|| 'unknown'}. Cannot display content directly.]`;
-						// One could add a download link here if needed
 					} catch (e){
 						responseBodyContent = '[Response body exists but could not be read or displayed]';
 					}
@@ -271,13 +292,15 @@
 
 			} catch (err){
 				console.error('Request failed:', err);
-				setResponse('请求失败:\n'+(err.message || String(err)));
+				let errorMessage = '请求失败:\n' + (err.message || String(err));
+				if (!useProxy && err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+					errorMessage += '\n\n提示：当不使用代理直接请求时，可能会遇到 CORS (跨域资源共享) 策略问题。请确保目标服务器允许来自此页面的跨域请求。';
+				}
+				setResponse(errorMessage);
 			} finally {
 				setIsLoading(false);
 			}
-		};
-
-		return (
+		};		return (
 				<div className="container mx-auto p-4 max-w-5xl bg-gray-50 min-h-screen">
 					<h1 className="text-center text-3xl font-bold text-indigo-700 my-6">
 						HTTP 代理工具
@@ -301,8 +324,14 @@
 					</div>
 
 					<div className="space-y-8 bg-white p-6 shadow-xl rounded-lg">
-						{/* 新增：手动重定向选项 */}
-						<div className="mb-4">
+						{/* 新增：代理和手动重定向选项 */}
+						<div className="mb-4 flex space-x-6">
+							<label htmlFor="useProxy" className="inline-flex items-center">
+								<input type="checkbox" id="useProxy" checked={!useProxy}
+											 onChange={e => setUseProxy(!e.target.checked)}
+											 className="form-checkbox h-5 w-5 text-indigo-600"/>
+								<span className="ml-2 text-gray-700">不使用代理</span>
+							</label>
 							<label htmlFor="manualRedirect" className="inline-flex items-center">
 								<input type="checkbox" id="manualRedirect" checked={manualRedirect}
 											 onChange={e=>setManualRedirect(e.target.checked)}
