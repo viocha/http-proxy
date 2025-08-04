@@ -59,12 +59,24 @@ export default async function handler(req: Request): Promise<Response> {
 			}
 		}
 
-		// 使用 fetch 向目标 URL 发起请求
+
+		// headers.delete('x-forwarded-host'); // huggingface space主页 必须删除x-forwarded-host才能访问
+		// 直接移除 x-forwarded- 开头的请求头
+		for (const key of [...headers.keys()]) {
+			if (key.toLowerCase().startsWith('x-forwarded-')) {
+				headers.delete(key);
+			}
+			if (key.toLowerCase().startsWith('x-vercel-')) {
+				headers.delete(key);
+			}
+		}
+		headers.delete('x-real-ip');
+
 		const response = await fetch(url, {
 			method,
 			headers,
 			body,
-			redirect,
+			redirect, // nodejs fetch默认是follow
 		});
 
 		// 先复制目标服务器的响应头，然后应用代理服务器的 CORS 策略
@@ -73,8 +85,8 @@ export default async function handler(req: Request): Promise<Response> {
 			respHeaders.set(key, value);
 		});
 
-		// 如果是手动处理重定向，且响应码是3xx，则将响应码修改为2xx
-		if (redirect && response.status >= 300 && response.status < 400) {
+		// 如果是手动处理重定向，且响应码是3xx，则将响应码修改为2xx，返回重定向中间响应
+		if (redirect === 'manual' && response.status >= 300 && response.status < 400) {
 			respHeaders.set('X-Redirect-Status', String(response.status));
 			respHeaders.set('X-Redirect-Location', response.headers.get('Location') || '');
 			return new Response(null, {
@@ -83,10 +95,9 @@ export default async function handler(req: Request): Promise<Response> {
 			});
 		}
 
-		// 返回正常的响应
+		// 返回最终的响应
 		return new Response(response.body, {
 			status: response.status,
-			statusText: response.statusText,
 			headers: respHeaders,
 		});
 	} catch (error: any) {
