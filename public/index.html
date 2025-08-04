@@ -24,6 +24,7 @@
 		const [isLoading, setIsLoading] = useState(false);
 		const [manualRedirect, setManualRedirect] = useState(false);
 		const [useProxy, setUseProxy] = useState(true); // 默认为 true，使用代理
+		const [copyStatus, setCopyStatus] = useState('');
 
 		const exampleRequests = [
 			{
@@ -141,7 +142,125 @@
 			setMultipartBody(multipartBody.map(p=>p.id===id? {...p, file:file, value:file? file.name: ''}: p));
 		};
 
-			const handleSendRequest = async()=>{
+		const handleCopyAsFetch = async(useProxyForCopy)=>{
+			// 1. 准备 Headers
+			const requestHeaders = new Headers();
+			let hasUserContentType = false;
+			headers.forEach(h=>{
+				if (h.name && h.value){
+					requestHeaders.set(h.name, h.value);
+					if (h.name.toLowerCase()==='content-type'){
+						hasUserContentType = true;
+					}
+				}
+			});
+
+			// 2. 准备 Body 和 Content-Type
+			let autoContentType = null;
+			let bodySetupCode = '';
+			let bodyInlinedCode = null; // The code to be inlined in fetch options
+
+			if (method!=='GET' && method!=='HEAD'){
+				switch (bodyType){
+					case 'json':
+						autoContentType = 'application/json; charset=utf-8';
+						bodyInlinedCode = `JSON.stringify(${jsonBody})`;
+						break;
+					case 'form':
+						const params = new URLSearchParams();
+						const paramsArray = [];
+						formBody.forEach(p=>{
+							if (p.name){
+								params.append(p.name, p.value);
+								paramsArray.push([p.name, p.value]);
+							}
+						});
+						autoContentType = 'application/x-www-form-urlencoded; charset=utf-8';
+						bodyInlinedCode = `new URLSearchParams(${JSON.stringify(paramsArray)})`;
+						break;
+					case 'multipart':
+						bodySetupCode = `const formData = new FormData();\n`;
+						multipartBody.forEach(p=>{
+							if (p.name){
+								const paramName = p.name.replaceAll('\'', '\\\''); // Escape single quotes
+								if (p.type==='file'){
+									bodySetupCode += `// TODO: You need to provide the actual file content for '${paramName}'.\n`;
+									bodySetupCode +=
+											`formData.append('${paramName}', new File(['file content'], 'filename', {type: 'filetype'}));\n`;
+								} else {
+									const paramValue = p.value.replaceAll('\'', '\\\''); // Escape single quotes
+									bodySetupCode += `formData.append('${paramName}', '${paramValue}');\n`;
+								}
+							}
+						});
+						bodyInlinedCode = 'formData';
+						break;
+					case 'binary':
+						bodySetupCode = `// TODO: You need to provide the file blob or buffer for the body.\n`;
+						bodySetupCode += `const bodyBlob = new Blob(['file content'], {type: 'application/octet-stream'});\n`;
+						bodyInlinedCode = 'bodyBlob';
+						break;
+				}
+			}
+
+			// 3. 构建 fetch 代码
+			let fetchUrl;
+			let fetchOptions;
+
+			const headersObject = {};
+			if (autoContentType){
+				requestHeaders.set('Content-Type', autoContentType);
+			}
+			requestHeaders.forEach((value, key)=>{ headersObject[key] = value; });
+
+			if (useProxyForCopy){
+				fetchUrl = `${window.location.origin}/api/proxy`;
+				const proxyHeaders = {...headersObject};
+				proxyHeaders['X-Url'] = url;
+				proxyHeaders['X-Method'] = method;
+				if (manualRedirect){
+					proxyHeaders['X-Redirect'] = 'manual';
+				}
+				fetchOptions = {
+					method:'POST',
+					headers:proxyHeaders,
+				};
+			} else {
+				fetchUrl = url;
+				fetchOptions = {
+					method:method,
+				};
+				if (Object.keys(headersObject).length>0){
+					fetchOptions.headers = headersObject;
+				}
+				if (manualRedirect){
+					fetchOptions.redirect = 'manual';
+				}
+			}
+
+			if (bodyInlinedCode){
+				fetchOptions.body = `%BODY_PLACEHOLDER%`; // Special placeholder
+			}
+			let optionsString = JSON.stringify(fetchOptions, null, 2).replace(
+					'"%BODY_PLACEHOLDER%"',
+					bodyInlinedCode,
+			);
+
+			const fetchCode = `${bodySetupCode? bodySetupCode+'\n': ''}fetch('${fetchUrl}', ${optionsString});`;
+
+			// 4. 复制到剪贴板
+			try {
+				await navigator.clipboard.writeText(fetchCode);
+				setCopyStatus('已复制!');
+				setTimeout(()=>setCopyStatus(''), 2000);
+			} catch (err){
+				console.error('Failed to copy: ', err);
+				setCopyStatus('复制失败!');
+				setTimeout(()=>setCopyStatus(''), 2000);
+			}
+		};
+
+		const handleSendRequest = async()=>{
 			setIsLoading(true);
 			setResponse('请求中...');
 
@@ -232,25 +351,25 @@
 						proxyHeaders.set('X-Redirect', 'manual');
 					}
 					// 将用户定义的所有header传递给代理
-					requestHeaders.forEach((value, key) => {
+					requestHeaders.forEach((value, key)=>{
 						proxyHeaders.set(key, value);
 					});
 
 					fetchUrl = '/api/proxy';
 					fetchOptions = {
-						method: 'POST', // 对代理的请求总是POST
-						headers: proxyHeaders,
-						body: bodyToSend,
-						redirect: 'manual', // 由代理处理重定向
+						method:'POST', // 对代理的请求总是POST
+						headers:proxyHeaders,
+						body:bodyToSend,
+						redirect:'manual', // 由代理处理重定向
 					};
 				} else {
 					// 直接请求的逻辑
 					fetchUrl = url;
 					fetchOptions = {
-						method: method,
-						headers: requestHeaders,
-						body: bodyToSend,
-						redirect: manualRedirect ? 'manual' : 'follow',
+						method:method,
+						headers:requestHeaders,
+						body:bodyToSend,
+						redirect:manualRedirect? 'manual': 'follow',
 					};
 				}
 
@@ -292,15 +411,17 @@
 
 			} catch (err){
 				console.error('Request failed:', err);
-				let errorMessage = '请求失败:\n' + (err.message || String(err));
-				if (!useProxy && err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
-					errorMessage += '\n\n提示：当不使用代理直接请求时，可能会遇到 CORS (跨域资源共享) 策略问题。请确保目标服务器允许来自此页面的跨域请求。';
+				let errorMessage = '请求失败:\n'+(err.message || String(err));
+				if (!useProxy && err.name==='TypeError' && err.message.includes('Failed to fetch')){
+					errorMessage
+							+= '\n\n提示：当不使用代理直接请求时，可能会遇到 CORS (跨域资源共享) 策略问题。请确保目标服务器允许来自此页面的跨域请求。';
 				}
 				setResponse(errorMessage);
 			} finally {
 				setIsLoading(false);
 			}
-		};		return (
+		};
+		return (
 				<div className="container mx-auto p-4 max-w-5xl bg-gray-50 min-h-screen">
 					<h1 className="text-center text-3xl font-bold text-indigo-700 my-6">
 						HTTP 代理工具
@@ -328,7 +449,7 @@
 						<div className="mb-4 flex space-x-6">
 							<label htmlFor="useProxy" className="inline-flex items-center">
 								<input type="checkbox" id="useProxy" checked={!useProxy}
-											 onChange={e => setUseProxy(!e.target.checked)}
+											 onChange={e=>setUseProxy(!e.target.checked)}
 											 className="form-checkbox h-5 w-5 text-indigo-600"/>
 								<span className="ml-2 text-gray-700">不使用代理</span>
 							</label>
@@ -380,7 +501,7 @@
 								))}
 							</div>
 							<button onClick={addHeader}
-											className="mt-3 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-medium transition-colors">
+											className="mt-3 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium transition-colors">
 								添加 Header
 							</button>
 						</div>
@@ -393,8 +514,8 @@
 										<button key={type} onClick={()=>setBodyType(type)}
 														className={`px-4 py-2 text-sm font-medium rounded-t-md focus:outline-none
 											${bodyType===type
-												? 'bg-indigo-600 text-white'
-												: 'text-gray-600 hover:bg-indigo-100 hover:text-indigo-700'}`}>
+												? 'bg-teal-600 text-white'
+												: 'text-gray-600 hover:bg-teal-100 hover:text-teal-700'}`}>
 											{type.charAt(0).toUpperCase()+type.slice(1)}
 										</button>
 								))}
@@ -423,7 +544,7 @@
 												</div>
 										))}
 										<button onClick={addFormParam}
-														className="mt-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-medium transition-colors">
+														className="mt-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium transition-colors">
 											添加 Form 参数
 										</button>
 									</div>
@@ -457,7 +578,7 @@
 												</div>
 										))}
 										<button onClick={addMultipartParam}
-														className="mt-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-medium transition-colors">
+														className="mt-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium transition-colors">
 											添加 Multipart 参数
 										</button>
 									</div>
@@ -469,10 +590,28 @@
 						</div>
 
 						{/* Send Button */}
-						<button onClick={handleSendRequest} disabled={isLoading}
-										className="w-full mt-8 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 disabled:bg-gray-400 transition-colors text-lg">
-							{isLoading? '发送中...': '发送请求'}
-						</button>
+						<div className="flex items-center space-x-4 mt-8">
+							<button onClick={handleSendRequest} disabled={isLoading}
+											className="flex-grow px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 disabled:bg-gray-400 transition-colors text-sm">
+								{isLoading? '发送中...': '发送请求'}
+							</button>
+							<div className="relative">
+								<button onClick={()=>handleCopyAsFetch(false)} disabled={isLoading}
+												className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-400 transition-colors text-sm">
+									复制为 fetch (直连)
+								</button>
+								{copyStatus && (
+										<span
+												className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-xs rounded py-1 px-2">
+											{copyStatus}
+										</span>
+								)}
+							</div>
+							<button onClick={()=>handleCopyAsFetch(true)} disabled={isLoading}
+											className="px-4 py-2 bg-teal-600 text-white font-semibold rounded-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-50 disabled:bg-gray-400 transition-colors text-sm">
+								复制为 fetch (代理)
+							</button>
+						</div>
 					</div>
 
 					{/* Response */}
