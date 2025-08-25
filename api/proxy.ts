@@ -60,7 +60,7 @@ export default async function handler(req: Request): Promise<Response> {
 		}
 
 
-		// headers.delete('x-forwarded-host'); // huggingface space主页 必须删除x-forwarded-host才能访问
+		// huggingface space主页 必须删除x-forwarded-host才能访问
 		// 直接移除 x-forwarded- 开头的请求头
 		for (const key of [...headers.keys()]) {
 			if (key.toLowerCase().startsWith('x-forwarded-')) {
