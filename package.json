@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.14"
+  },
+  "dependencies": {
+    "vercel": "^46.1.0"
   }
 }

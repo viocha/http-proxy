@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      vercel:
+        specifier: ^46.1.0
+        version: 46.1.0
     devDependencies:
       '@cloudflare/next-on-pages':
         specifier: ^1.13.14
