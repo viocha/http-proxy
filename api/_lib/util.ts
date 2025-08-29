@@ -11,6 +11,7 @@ export function genCorsHeaders({allowMethods, request}: {
 		// 客户端可以指定需要暴露的响应头部
 		'Access-Control-Expose-Headers': request.headers.get('X-Response-Expose-Headers')
 				|| ExposeHeaders.join(', '),
+		'Access-Control-Max-Age': String(30 * 24 * 60 * 60), // 30天
 	};
 	const clientOrigin = request.headers.get('Origin');
 
