@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "vercel-dev": "vercel dev --debug",
     "vercel-preview": "vercel deploy",
     "vercel-deploy": "vercel deploy --prod",
