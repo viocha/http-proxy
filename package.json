@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "vercel-dev": "vercel dev --debug",
-    "commit-push": "git add .; git commit -m 'update'; git push"
+    "vercel-dev": "vercel dev --debug"
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.14",
+    "next": "^15.5.2",
     "vercel": "^46.1.0"
   }
 }
