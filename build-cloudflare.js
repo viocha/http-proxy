@@ -3,12 +3,13 @@ import path from 'path';
 
 const vercelDir = './api';
 const cloudflareDir = './functions';
+const cloudflareApiDir = './functions/api';
 
 async function convertVercelToCloudflare() {
 	try {
 		// 确保 Cloudflare 的 functions 目录存在且为空
 		await fs.rm(cloudflareDir, { recursive: true, force: true });
-		await fs.mkdir(cloudflareDir, { recursive: true });
+		await fs.mkdir(cloudflareApiDir, { recursive: true });
 		
 		// 读取 Vercel 的 api 目录
 		const files = await fs.readdir(vercelDir);
@@ -41,7 +42,7 @@ export const onRequest = async (context:any) => {
 `;
 					
 					// 写入到 Cloudflare 的 functions 目录
-					const destinationPath = path.join(cloudflareDir, file);
+					const destinationPath = path.join(cloudflareApiDir, file);
 					await fs.writeFile(destinationPath, cloudflareWrapper.trim());
 					console.log(`Successfully created ${destinationPath}`);
 				}
