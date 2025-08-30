@@ -1,6 +1,6 @@
 // /api/get.ts
 
-import {genCorsHeaders} from './_lib/util.js';
+import {genCorsHeaders} from './_lib/util.ts';
 
 export const config = {
 	runtime: 'edge', // 指定这是一个 Edge Function

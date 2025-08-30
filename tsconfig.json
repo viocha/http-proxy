@@ -9,6 +9,5 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "allowImportingTsExtensions": true
-  },
-  "include": ["api"]
+  }
 }
