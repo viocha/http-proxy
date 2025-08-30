@@ -1,0 +1,9 @@
+# wrangler.toml
+name = "proxy"
+main = "_worker.js"
+compatibility_date = "2025-08-30"
+
+# [site] 配置块告诉 Wrangler 如何处理静态资源
+# "bucket" 指向你的静态文件所在的目录
+[site]
+bucket = "./public"

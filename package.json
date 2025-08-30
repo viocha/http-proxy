@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "vercel-dev": "vercel dev --debug",
-    "build-cloudflare": "node build-cloudflare.js"
+    "build-page": "node build-cloudflare-page.js",
+    "build-woker": "node build-cloudflare-worker.js",
+    "build-deno": "deno run -A build-deno-deploy.ts"
   }
 }

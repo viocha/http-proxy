@@ -1,6 +1,7 @@
 test
 functions
 deno-deploy-entry.ts
+_worker.js
 
 ### Node template
 # Logs
