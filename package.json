@@ -8,8 +8,5 @@
     "build-worker": "node build-cloudflare-worker.js",
     "build-deno": "deno run -A build-deno-deploy.ts"
   },
-  "packageManager": "pnpm@10.12.2",
-  "devDependencies": {
-    "typescript": "^5.9.2"
-  }
+  "packageManager": "pnpm@10.12.2"
 }
