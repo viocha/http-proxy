@@ -7,8 +7,5 @@
     "build-page": "node build-cloudflare-page.js",
     "build-worker": "node build-cloudflare-worker.js",
     "build-deno": "deno run -A build-deno-deploy.ts"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.2"
   }
 }
