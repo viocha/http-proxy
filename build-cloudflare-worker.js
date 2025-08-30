@@ -49,7 +49,7 @@ export default {
     }
 
     // 如果没有匹配到任何 API 路由，则将请求交给静态资源服务处理。
-    return env.__STATIC_CONTENT.fetch(request);
+    return env.ASSETS.fetch(request);
   },
 };
 `;
