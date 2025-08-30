@@ -1,4 +1,3 @@
-// @ts-ignore
 import { join, fromFileUrl, dirname } from "https://deno.land/std@0.224.0/path/mod.ts";
 
 const __dirname = dirname(fromFileUrl(import.meta.url));
@@ -16,8 +15,7 @@ async function generateAdapter() {
 	console.log("🔍 Scanning for functions in:", API_DIR);
 	const routes: RouteInfo[] = [];
 
-	// @ts-ignore
-	for await (const entry of Deno.readDir(API_DIR)) {
+		for await (const entry of Deno.readDir(API_DIR)) {
 		if (entry.isDirectory || !/\.(ts|js)$/.test(entry.name)) {
 			console.log(`- Skipping ${entry.name}`);
 			continue;
@@ -34,6 +32,15 @@ async function generateAdapter() {
 			importName,
 		});
 		console.log(`✅ Found API route: ${routePath} -> ${modulePath}`);
+
+		// 将文件中的 import .js 替换为 import .ts
+		const filePath = join(API_DIR, fileName);
+		let content = await Deno.readTextFile(filePath);
+		const updatedContent = content.replace(/(import\s+.*?from\s+['"].*?)\.js(['"])/g, '$1.ts$2');
+		if (content !== updatedContent) {
+			await Deno.writeTextFile(filePath, updatedContent);
+			console.log(`   🔄 Updated imports in ${fileName} from .js to .ts`);
+		}
 	}
 
 	// --- 生成代码 ---
@@ -75,7 +82,6 @@ Deno.serve(async (req: Request) => {
 });
 `;
 
-	// @ts-ignore
 	await Deno.writeTextFile(OUTPUT_FILE, fileContent.trim());
 	console.log(`\n🎉 Successfully generated adapter file: ${OUTPUT_FILE}`);
 	console.log("You can now run 'deno run --allow-net --allow-read deno-deploy-entry.ts' to test it.");
