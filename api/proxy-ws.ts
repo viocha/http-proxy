@@ -11,8 +11,20 @@ interface ActiveFetch {
 	requestBodyWriter: WritableStreamDefaultWriter<Uint8Array>;
 }
 
-// 这个函数现在是 Worker 的默认导出，符合 Vercel Edge Function 的格式
+// 这个函数现在是 Worker 的默认导出
 export default async function handler(request: Request): Promise<Response> {
+	// --- 新增：处理 CORS 预检请求 ---
+	// 当浏览器跨域发起 WebSocket 连接时，会先发送一个 OPTIONS 请求。
+	// 我们必须正确响应这个请求，否则浏览器会阻止后续的连接。
+	if (request.method === 'OPTIONS') {
+		const corsHeaders = genCorsHeaders({ request, allowMethods: 'GET, OPTIONS' });
+		// 返回 204 No Content 状态码，并附上 CORS 头部，这是标准做法。
+		return new Response(null, { status: 204, headers: corsHeaders });
+	}
+	// --- 新增逻辑结束 ---
+
+
+	// --- 以下是您原有的代码，保持不变 ---
 	const upgradeHeader = request.headers.get('Upgrade');
 	if (upgradeHeader !== 'websocket') {
 		return new Response('Expected Upgrade: websocket', { status: 426 });
@@ -57,10 +69,8 @@ export default async function handler(request: Request): Promise<Response> {
 						const { url, method, headers: clientHeaders, redirect } = details;
 						const controller = new AbortController();
 
-						// 关键修正：创建一个新的 Headers 对象，并从客户端传来
 						const headers = new Headers(clientHeaders);
 
-						// 移除代理和 Vercel 特定的头部，以及 Host 头部
 						headers.delete('host');
 						for (const key of [...headers.keys()]) {
 							if (key.toLowerCase().startsWith('x-vercel-') || key.toLowerCase().startsWith('x-forwarded-')) {
@@ -74,7 +84,6 @@ export default async function handler(request: Request): Promise<Response> {
 
 						activeFetches.set(reqId, { controller, requestBodyWriter });
 
-						// 使用重构的 Request 对象发起 fetch
 						const newRequest = new Request(url, {
 							method,
 							headers,
@@ -84,7 +93,6 @@ export default async function handler(request: Request): Promise<Response> {
 						});
 
 						fetch(newRequest).then(async (response) => {
-							// 1. 发送响应头
 							server.send(JSON.stringify({
 								type: 'response',
 								reqId,
@@ -95,7 +103,6 @@ export default async function handler(request: Request): Promise<Response> {
 								},
 							}));
 
-							// 2. 流式传输响应体
 							if (response.body) {
 								const reader = response.body.getReader();
 								const reqIdBytes = new TextEncoder().encode(reqId);
@@ -114,7 +121,6 @@ export default async function handler(request: Request): Promise<Response> {
 								}
 							}
 
-							// 3. 发送响应结束信号
 							server.send(JSON.stringify({ type: 'response-end', reqId }));
 						}).catch(error => {
 							server.send(JSON.stringify({ type: 'error', reqId, message: error.message }));
@@ -159,6 +165,7 @@ export default async function handler(request: Request): Promise<Response> {
 		activeFetches.clear();
 	});
 
+	// 这一部分也保持不变，在 101 响应中包含 CORS 头部是正确的
 	const corsHeaders = genCorsHeaders({ request, allowMethods: 'GET, OPTIONS' });
 	return new Response(null, {
 		status: 101,
