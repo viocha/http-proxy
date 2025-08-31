@@ -24,7 +24,9 @@ async function convertVercelToCloudflare() {
 				
 				// 这是一个简单的检查，判断是否是 Vercel Edge Function
 				// 你可以根据需要让这个判断更智能
-				if (fileContent.includes('export default function') || fileContent.includes('runtime: \'edge\'')) {
+				if (fileContent.includes('export default async function')
+						||fileContent.includes('export default function')
+						|| fileContent.includes('runtime: \'edge\'')) {
 					console.log(`Converting ${file} to Cloudflare format...`);
 					
 					// 生成 Cloudflare Pages Function 的包装代码

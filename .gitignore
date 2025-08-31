@@ -2,6 +2,7 @@ test
 functions
 deno-deploy-entry.ts
 _worker.js
+.wrangler
 
 ### Node template
 # Logs

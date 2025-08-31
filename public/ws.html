@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>WebSocket 代理客户端全面测试</title>
+<style>
+	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; color: #333; }
+	h1, h2, h3 { color: #111; }
+	pre { background-color: #f4f4f4; padding: 15px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 14px; }
+	.test-case { border-left: 4px solid #ccc; padding-left: 20px; margin-bottom: 30px; }
+	.success { border-left-color: #28a745; }
+	.error { border-left-color: #dc3545; }
+	.info { background-color: #eef; border-left: 4px solid #007bff; padding: 10px 15px; margin-bottom: 10px; border-radius: 5px;}
+	.info strong { color: #0056b3; }
+	code { background-color: #eee; padding: 2px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>WebSocket 代理客户端全面测试</h1>
+<p>请打开浏览器控制台查看详细日志。测试结果也会显示在下方页面中。</p>
+<div id="results"></div>
+
+<!-- 引入客户端库 -->
+<script src="./proxy-client.js"></script>
+
+<script>
+	// --- 初始化客户端 ---
+	const u = new URL(window.location.href);
+	u.protocol = u.protocol.replace('http', 'ws');
+	u.pathname = '/api/proxy-ws';
+	const PROXY_URL = u.toString();
+	console.log('使用的 WebSocket 代理 URL:', PROXY_URL);
+
+	const proxyClient = new WebSocketProxyClient(PROXY_URL);
+	const resultsDiv = document.getElementById('results');
+
+	// --- 增强的日志和渲染函数 ---
+	function renderTestCase(id, title, description, input, expectation) {
+		const container = document.createElement('div');
+		container.id = `case-${id}`;
+		container.className = 'test-case';
+
+		const h2 = document.createElement('h2');
+		h2.textContent = `${id}. ${title}`;
+		container.appendChild(h2);
+
+		const descP = document.createElement('p');
+		descP.innerHTML = description;
+		container.appendChild(descP);
+
+		const infoDiv = document.createElement('div');
+		infoDiv.className = 'info';
+		infoDiv.innerHTML = `<strong>输入数据:</strong><pre>${input}</pre><strong>预期结果:</strong><p>${expectation}</p>`;
+		container.appendChild(infoDiv);
+
+		const resultTitle = document.createElement('h3');
+		resultTitle.textContent = '关键结果:';
+		container.appendChild(resultTitle);
+
+		const pre = document.createElement('pre');
+		pre.textContent = '正在运行...';
+		container.appendChild(pre);
+
+		resultsDiv.appendChild(container);
+		return { container, pre };
+	}
+
+	function updatePageResult(container, pre, data, isError = false) {
+		try {
+			pre.textContent = JSON.stringify(data, null, 2);
+			container.classList.add(isError ? 'error' : 'success');
+		} catch (e) {
+			pre.textContent = `渲染结果时出错: ${data}`;
+			container.classList.add('error');
+		}
+	}
+
+	async function runTest(id, title, description, input, expectation, testFn) {
+		const { container, pre } = renderTestCase(id, title, description, input, expectation);
+
+		// **核心修正：为每个案例创建一个控制台日志组**
+		console.group(`案例 ${id}: ${title}`);
+
+		try {
+			const result = await testFn();
+			updatePageResult(container, pre, result);
+			console.log('关键结果:', result);
+		} catch (e) {
+			const errorInfo = { 错误信息: e.message, 堆栈: e.stack };
+			updatePageResult(container, pre, errorInfo, true);
+			console.error('测试失败:', errorInfo);
+		} finally {
+			console.groupEnd();
+		}
+	}
+
+	// --- 测试用例 ---
+	async function runAllTests() {
+		await runTest(
+				1, 'GET 请求与 URL 查询参数',
+				'测试 URL 查询参数是否被正确转发。',
+				"proxyClient.fetch('https://httpbin.org/get?name=Cloudflare&product=Workers')",
+				'响应中的 <code>args</code> 对象应包含 <code>name</code> 和 <code>product</code> 字段。',
+				async () => {
+					const response = await proxyClient.fetch('https://httpbin.org/get?name=Cloudflare&product=Workers');
+					const data = await response.json();
+					console.log('原始响应 (Raw Response):', data);
+					return data.args;
+				}
+		);
+
+		await runTest(
+				2, '自定义请求头',
+				'测试自定义请求头是否被正确发送到目标服务器。',
+				"proxyClient.fetch('...', { headers: { 'X-Custom-Header': 'MyValue', 'Authorization': '...' } })",
+				'响应中的 <code>headers</code> 对象应包含我们发送的自定义头。',
+				async () => {
+					const response = await proxyClient.fetch('https://httpbin.org/headers', {
+						headers: { 'X-Custom-Header': 'MyValue', 'Authorization': 'Bearer 12345' }
+					});
+					const data = await response.json();
+					console.log('原始响应 (Raw Response):', data);
+					return data.headers;
+				}
+		);
+
+		await runTest(
+				3, 'POST 请求与 JSON 请求体',
+				'测试将一个 JSON 对象作为请求体发送。',
+				"proxyClient.fetch('...', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(...) })",
+				'响应中的 <code>json</code> 字段应与我们发送的 JSON 对象完全一致。',
+				async () => {
+					const jsonData = { user: 'test', id: 1 };
+					const response = await proxyClient.fetch('https://httpbin.org/post', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify(jsonData)
+					});
+					const data = await response.json();
+					console.log('原始响应 (Raw Response):', data);
+					return data.json;
+				}
+		);
+
+		await runTest(
+				4, 'POST 请求与 URLSearchParams 请求体',
+				'测试使用 <code>URLSearchParams</code> 发送表单数据。浏览器应自动设置 <code>Content-Type</code> 为 <code>application/x-www-form-urlencoded</code>。',
+				"proxyClient.fetch('...', { method: 'POST', body: new URLSearchParams(...) })",
+				'响应中的 <code>form</code> 字段应包含提交的数据。',
+				async () => {
+					const params = new URLSearchParams({ username: 'wrangler', action: 'deploy' });
+					const response = await proxyClient.fetch('https://httpbin.org/post', { method: 'POST', body: params });
+					const data = await response.json();
+					console.log('原始响应 (Raw Response):', data);
+					return data.form;
+				}
+		);
+
+		await runTest(
+				5, 'POST 请求与 FormData 请求体',
+				'测试发送包含文件的 <code>multipart/form-data</code>。浏览器应自动设置正确的 <code>Content-Type</code> 和 <code>boundary</code>。',
+				"proxyClient.fetch('...', { method: 'POST', body: new FormData(...) })",
+				'响应应包含 <code>files</code> 和 <code>form</code> 字段，对应上传的内容。',
+				async () => {
+					const formData = new FormData();
+					formData.append('file', new Blob(['hello world']), 'test.txt');
+					formData.append('field1', 'value1');
+					const response = await proxyClient.fetch('https://httpbin.org/post', { method: 'POST', body: formData });
+					const data = await response.json();
+					console.log('原始响应 (Raw Response):', data);
+					return { files: data.files, form: data.form };
+				}
+		);
+
+		await runTest(
+				6, 'PUT 请求与 ArrayBuffer 请求体',
+				'测试发送原始二进制数据。',
+				"proxyClient.fetch('...', { method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: ... })",
+				'响应中的 <code>data</code> 字段应是发送的二进制数据的 Base64 编码。',
+				async () => {
+					const buffer = new Uint8Array([1, 2, 3, 4, 5]).buffer;
+					const response = await proxyClient.fetch('https://httpbin.org/put', {
+						method: 'PUT',
+						headers: { 'Content-Type': 'application/octet-stream' },
+						body: buffer
+					});
+					const data = await response.json();
+					console.log('案例 6 - 原始响应 (Raw Response):', data);
+					// 将返回的原始字符串转换为 Base64
+					return btoa(data.data);
+				}
+		);
+
+		await runTest(
+				7, '解析响应为 .text()',
+				'测试将响应体解析为纯文本。',
+				"proxyClient.fetch('https://httpbin.org/robots.txt')",
+				'结果应为 <code>httpbin.org</code> 的 <code>robots.txt</code> 文件内容。',
+				async () => {
+					const response = await proxyClient.fetch('https://httpbin.org/robots.txt');
+					// 对于非 JSON 响应，我们克隆它来记录头部，然后解析
+					const clonedResponse = response.clone();
+					const text = await response.text();
+					console.log('原始响应 (Raw Response):', { status: clonedResponse.status, headers: Object.fromEntries(clonedResponse.headers.entries()), body: text });
+					return text;
+				}
+		);
+
+		await runTest(
+				8, '解析响应为 .blob()',
+				'测试将响应体解析为 Blob 对象，常用于处理图片或文件。',
+				"proxyClient.fetch('https://httpbin.org/image/png')",
+				'结果应显示 Blob 的类型 (<code>image/png</code>) 和大小。',
+				async () => {
+					const response = await proxyClient.fetch('https://httpbin.org/image/png');
+					console.log('原始响应头 (Raw Response Headers):', Object.fromEntries(response.headers.entries()));
+					const blob = await response.blob();
+					return { type: blob.type, size: blob.size };
+				}
+		);
+
+		await runTest(
+				9, '解析响应为 .arrayBuffer()',
+				'测试将响应体解析为 ArrayBuffer，用于处理二进制数据。',
+				"proxyClient.fetch('https://httpbin.org/bytes/16')",
+				'结果应显示 ArrayBuffer 的字节长度为 16。',
+				async () => {
+					const response = await proxyClient.fetch('https://httpbin.org/bytes/16');
+					console.log('原始响应头 (Raw Response Headers):', Object.fromEntries(response.headers.entries()));
+					const buffer = await response.arrayBuffer();
+					return { byteLength: buffer.byteLength };
+				}
+		);
+
+		await runTest(
+				10, '手动处理重定向',
+				'测试 <code>redirect: "manual"</code> 选项。代理不应跟随重定向，而是返回 302 响应。',
+				"proxyClient.fetch('...', { redirect: 'manual' })",
+				'响应状态码应为 302，<code>redirected</code> 为 false，且 <code>location</code> 头部指向 "/get"。',
+				async () => {
+					const response = await proxyClient.fetch('https://httpbin.org/redirect/1', { redirect: 'manual' });
+					console.log('原始响应 (Raw Response):', { status: response.status, headers: Object.fromEntries(response.headers.entries()) });
+					return {
+						status: response.status,
+						redirected: response.redirected,
+						location: response.headers.get('location')
+					};
+				}
+		);
+	}
+
+	// --- 增强的 proxyClient.fetch ---
+	const originalFetch = proxyClient.fetch.bind(proxyClient);
+	proxyClient.fetch = function(url, options = {}) {
+		// 这个日志现在会嵌套在每个案例的日志组内部
+		console.groupCollapsed(`[代理请求] ${options.method || 'GET'} ${url}`);
+		console.log('请求参数 (Options):', options);
+		if (options.body) {
+			console.log('请求体类型 (Body Type):', options.body.constructor.name);
+		}
+		console.groupEnd();
+		return originalFetch(url, options);
+	};
+
+	// --- 运行测试 ---
+	proxyClient.ensureConnected().then(runAllTests).catch(err => {
+		const { container, pre } = renderTestCase('init', '初始化连接', '', '无', '');
+		updatePageResult(container, pre, { 错误信息: err.message }, true);
+	});
+</script>
+</body>
+</html>
