@@ -13,6 +13,21 @@ interface RouteInfo {
 }
 
 async function generateAdapter() {
+	// 首先如果 api/proxy-ws.ts 和 api/proxy-ws-deno.ts 存在，则用 api/proxy-ws-deno.ts 覆盖 api/proxy-ws.ts 并删除 api/proxy-ws-deno.ts
+	const proxyWsDenoPath = join(API_DIR, 'proxy-ws-deno.ts');
+	const proxyWsPath = join(API_DIR, 'proxy-ws.ts');
+	try {
+		await Deno.stat(proxyWsDenoPath);
+		// proxy-ws-deno.ts 存在，覆盖 proxy-ws.ts
+		const content = await Deno.readTextFile(proxyWsDenoPath);
+		await Deno.writeTextFile(proxyWsPath, content);
+		await Deno.remove(proxyWsDenoPath);
+		console.log(`🔄 Replaced proxy-ws.ts with proxy-ws-deno.ts and removed proxy-ws-deno.ts`);
+	} catch {
+		// proxy-ws-deno.ts 不存在，什么都不做
+	}
+
+	// --- 扫描 API 目录 ---
 	console.log("🔍 Scanning for functions in:", API_DIR);
 	const routes: RouteInfo[] = [];
 
