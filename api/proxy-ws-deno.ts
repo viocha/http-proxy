@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-// 假设您有这个工具函数
+// 您的工具函数可以保留，但在这个 handler 中不会被用来修改升级响应
 import { genCorsHeaders } from "./_lib/util.js";
 
 interface ActiveFetch {
@@ -9,22 +9,23 @@ interface ActiveFetch {
 }
 
 export default async function handler(request: Request): Promise<Response> {
+	// 如果是 CORS 预检请求，正常处理并返回
+	if (request.method === "OPTIONS") {
+		const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
+		return new Response(null, { headers: corsHeaders });
+	}
+
 	const upgradeHeader = request.headers.get("Upgrade");
 	if (upgradeHeader !== "websocket") {
 		return new Response("Expected Upgrade: websocket", { status: 426 });
 	}
 
-	// *** 关键修正 ***
-	// 在升级 WebSocket 之前生成 CORS 头部。
-	// 此时 'request' 对象仍然是有效的。
-	const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
+	// 获取 socket 和 必须原样返回的 response 对象
+	const { socket, response } = Deno.upgradeWebSocket(request);
 
-	// 现在，升级 WebSocket。这个调用会“消费”掉 request 对象。
-	const { socket, response: upgradeResponse } = Deno.upgradeWebSocket(request);
-
+	// 所有 socket 的事件监听器逻辑保持完全不变
 	const activeFetches = new Map<string, ActiveFetch>();
 
-	// 为 socket 绑定事件监听器的逻辑保持不变
 	socket.addEventListener("message", async (event) => {
 		// --- 处理数据消息 (二进制) ---
 		if (event.data instanceof ArrayBuffer) {
@@ -166,16 +167,8 @@ export default async function handler(request: Request): Promise<Response> {
 		activeFetches.clear();
 	});
 
-	// 创建最终的响应头部，合并升级头部和我们的CORS头部
-	const finalHeaders = new Headers(upgradeResponse.headers);
-	for (const [key, value] of Object.entries(corsHeaders)) {
-		finalHeaders.set(key, value);
-	}
-
-	// 返回一个新的 Response 对象，其中包含所有正确的头部
-	return new Response(upgradeResponse.body, {
-		status: upgradeResponse.status,
-		statusText: upgradeResponse.statusText,
-		headers: finalHeaders,
-	});
+	// *** 关键修正 ***
+	// 直接返回从 Deno.upgradeWebSocket 获取的原始 response 对象。
+	// 不要以任何方式修改它或用它来创建新的 Response。
+	return response;
 }
