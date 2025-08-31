@@ -14,12 +14,17 @@ export default async function handler(request: Request): Promise<Response> {
 		return new Response("Expected Upgrade: websocket", { status: 426 });
 	}
 
-	// 1. 获取 socket 和 原始的、头部不可变的 upgradeResponse
+	// *** 关键修正 ***
+	// 在升级 WebSocket 之前生成 CORS 头部。
+	// 此时 'request' 对象仍然是有效的。
+	const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
+
+	// 现在，升级 WebSocket。这个调用会“消费”掉 request 对象。
 	const { socket, response: upgradeResponse } = Deno.upgradeWebSocket(request);
 
-	// 2. 像之前一样，为 socket 绑定所有事件监听器
 	const activeFetches = new Map<string, ActiveFetch>();
 
+	// 为 socket 绑定事件监听器的逻辑保持不变
 	socket.addEventListener("message", async (event) => {
 		// --- 处理数据消息 (二进制) ---
 		if (event.data instanceof ArrayBuffer) {
@@ -161,20 +166,16 @@ export default async function handler(request: Request): Promise<Response> {
 		activeFetches.clear();
 	});
 
-	// *** 关键修正 ***
-	// 3. 创建一个新的、可变的 Headers 对象，并复制原始响应的头部
-	const headers = new Headers(upgradeResponse.headers);
-
-	// 4. 将自定义的 CORS 头部添加到这个新对象中
-	const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
+	// 创建最终的响应头部，合并升级头部和我们的CORS头部
+	const finalHeaders = new Headers(upgradeResponse.headers);
 	for (const [key, value] of Object.entries(corsHeaders)) {
-		headers.set(key, value);
+		finalHeaders.set(key, value);
 	}
 
-	// 5. 创建并返回一个全新的 Response 对象
+	// 返回一个新的 Response 对象，其中包含所有正确的头部
 	return new Response(upgradeResponse.body, {
 		status: upgradeResponse.status,
 		statusText: upgradeResponse.statusText,
-		headers, // 使用我们组合好的新头部
+		headers: finalHeaders,
 	});
 }
