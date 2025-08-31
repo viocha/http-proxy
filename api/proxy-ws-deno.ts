@@ -8,16 +8,16 @@ interface ActiveFetch {
 	requestBodyWriter: WritableStreamDefaultWriter<Uint8Array>;
 }
 
-// 这个函数现在符合 Deno Deploy 的 WebSocket 升级模式
 export default async function handler(request: Request): Promise<Response> {
 	const upgradeHeader = request.headers.get("Upgrade");
 	if (upgradeHeader !== "websocket") {
 		return new Response("Expected Upgrade: websocket", { status: 426 });
 	}
 
-	// Deno Deploy 的 WebSocket 升级方式
-	const { socket, response } = Deno.upgradeWebSocket(request);
+	// 1. 获取 socket 和 原始的、头部不可变的 upgradeResponse
+	const { socket, response: upgradeResponse } = Deno.upgradeWebSocket(request);
 
+	// 2. 像之前一样，为 socket 绑定所有事件监听器
 	const activeFetches = new Map<string, ActiveFetch>();
 
 	socket.addEventListener("message", async (event) => {
@@ -54,7 +54,6 @@ export default async function handler(request: Request): Promise<Response> {
 
 						const headers = new Headers(clientHeaders);
 
-						// 移除代理和平台特定的头部，以及 Host 头部
 						headers.delete("host");
 						for (const key of [...headers.keys()]) {
 							if (
@@ -82,7 +81,6 @@ export default async function handler(request: Request): Promise<Response> {
 						});
 
 						fetch(newRequest).then(async (fetchResponse) => {
-							// 1. 发送响应头
 							socket.send(JSON.stringify({
 								type: "response",
 								reqId,
@@ -93,7 +91,6 @@ export default async function handler(request: Request): Promise<Response> {
 								},
 							}));
 
-							// 2. 流式传输响应体
 							if (fetchResponse.body) {
 								const reader = fetchResponse.body.getReader();
 								const reqIdBytes = new TextEncoder().encode(reqId);
@@ -114,7 +111,6 @@ export default async function handler(request: Request): Promise<Response> {
 								}
 							}
 
-							// 3. 发送响应结束信号
 							socket.send(JSON.stringify({ type: "response-end", reqId }));
 						}).catch((error) => {
 							socket.send(
@@ -165,14 +161,20 @@ export default async function handler(request: Request): Promise<Response> {
 		activeFetches.clear();
 	});
 
-	// 将 CORS 头部添加到 Deno.upgradeWebSocket 返回的响应中
-	const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
 	// *** 关键修正 ***
-	// 使用 Object.entries() 来迭代一个普通的 JavaScript 对象
+	// 3. 创建一个新的、可变的 Headers 对象，并复制原始响应的头部
+	const headers = new Headers(upgradeResponse.headers);
+
+	// 4. 将自定义的 CORS 头部添加到这个新对象中
+	const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
 	for (const [key, value] of Object.entries(corsHeaders)) {
-		response.headers.append(key, value);
+		headers.set(key, value);
 	}
 
-	// 返回 Deno.upgradeWebSocket 提供的响应对象
-	return response;
+	// 5. 创建并返回一个全新的 Response 对象
+	return new Response(upgradeResponse.body, {
+		status: upgradeResponse.status,
+		statusText: upgradeResponse.statusText,
+		headers, // 使用我们组合好的新头部
+	});
 }
