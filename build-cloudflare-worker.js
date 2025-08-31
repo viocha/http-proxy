@@ -14,7 +14,10 @@ try {
 	
 	for (const file of tsFiles){
 		const routeName = path.basename(file, '.ts');
-		const handlerName = `${routeName}Handler`;
+		// 替换非法js变量名字符
+		const safeRouteName = routeName.replace(/[^a-zA-Z0-9_$]/g, '_');
+		
+		const handlerName = `${safeRouteName}Handler`;
 		const routePath = `/api/${routeName}`;
 		const importPath = `./api/${file}`;
 		
