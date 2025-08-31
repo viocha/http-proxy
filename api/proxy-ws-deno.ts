@@ -167,7 +167,9 @@ export default async function handler(request: Request): Promise<Response> {
 
 	// 将 CORS 头部添加到 Deno.upgradeWebSocket 返回的响应中
 	const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
-	for (const [key, value] of corsHeaders.entries()) {
+	// *** 关键修正 ***
+	// 使用 Object.entries() 来迭代一个普通的 JavaScript 对象
+	for (const [key, value] of Object.entries(corsHeaders)) {
 		response.headers.append(key, value);
 	}
 
