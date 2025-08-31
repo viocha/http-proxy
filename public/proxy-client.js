@@ -10,6 +10,18 @@ class WebSocketProxyClient {
 		this._connect();
 	}
 	
+	/**
+	 * 主动关闭 WebSocket 连接。
+	 * 如果连接已打开，则会正常关闭它。
+	 * onclose 事件处理器将负责清理剩余的资源。
+	 */
+	close() {
+		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+			this.ws.close();
+			console.log('WebSocket proxy connection closing.');
+		}
+	}
+	
 	_connect() {
 		this.connectionPromise = new Promise((resolve, reject) => {
 			this.ws = new WebSocket(this.proxyUrl);
