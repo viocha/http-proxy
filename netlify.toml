@@ -1,3 +1,6 @@
+[edge_functions]
+directory = "api"
+
 [[edge_functions]]
 path = "/api/*"
-function = "api"
+function = "hello"
