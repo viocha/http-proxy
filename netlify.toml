@@ -1,12 +1,4 @@
-# netlify.toml
-
 [build]
-# 运行 package.json 中的 "build" 脚本
 command = "node build-netlify.js"
+edge_functions = "/api"
 
-# Edge Functions 的源目录
-edge_functions = "api"
-
-[[edge_functions]]
-path = "/api/*"
-function = "api"
