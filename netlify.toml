@@ -1,4 +1,4 @@
 [build]
-#command = "node build-netlify.js"
+command = "node build-netlify.js"
 edge_functions = "/api"
 
