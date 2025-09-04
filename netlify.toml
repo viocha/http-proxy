@@ -1,16 +1,16 @@
 # netlify.toml
 
+# 第一部分：告诉 Netlify Edge Functions 的源文件在哪里
 [build]
-# 关键配置 (第一步):
-# 告诉 Netlify，你的 Edge Functions 源文件存放在根目录下的 "api" 文件夹中。
+# 这个设置是正确的，它告诉 Netlify 在根目录的 "api" 文件夹中寻找函数代码。
 edge_functions = "api"
 
-# 路由规则 (第二步):
+# 第二部分：定义 URL 路由规则
 [[edge_functions]]
-# 告诉 Netlify，所有匹配 /api/* 格式的请求都应该由 Edge Function 处理。
+# 匹配所有 /api/ 开头的请求
 path = "/api/*"
 
-# 注意：当 path 指向一个通配符目录，并且你已经在 [build] 中设置了 edge_functions 目录时，
-# `function` 字段是可选的。Netlify 会足够智能，自动根据请求的 URL
-# 去你的 `edge_functions` 目录（也就是 "api" 目录）下寻找对应的文件。
-# 例如，请求 /api/hello 会自动执行 api/hello.ts 文件。
+# 关键：必须指定处理这些请求的函数名称。
+# 这个名称 "api" 对应了你在 [build] 部分设置的目录名。
+# Netlify 会将这两者关联起来。
+function = "api"
