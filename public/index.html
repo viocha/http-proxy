@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
-<title>HTTP Proxy 工具</title>
+<title>HTTP Proxy 工具 (增强版 v2.1)</title>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -10,10 +10,12 @@
 
 <script type="text/babel" data-type="module">
 	import {
+		AccessTime,
 		Add, ContentCopy, Delete, FileUpload,
 	} from 'https://esm.sh/@mui/icons-material?standalone';
 	import {
-		Box, Button, Checkbox, CircularProgress, Container, FormControl, FormControlLabel, InputLabel, MenuItem, Paper,
+		Box, Button, Checkbox, Chip,
+		CircularProgress, Container, FormControl, FormControlLabel, InputLabel, MenuItem, Paper,
 		Select, Stack, Tab, Tabs, TextField, Typography,
 	} from 'https://esm.sh/@mui/material?standalone';
 	import React, {useCallback, useEffect, useState} from 'https://esm.sh/react';
@@ -23,7 +25,7 @@
 	// 主应用组件
 	// ==================================
 	function App(){
-		// --- 状态管理 (与原版完全相同) ---
+		// --- 状态管理 ---
 		const [method, setMethod] = useState('GET');
 		const [url, setUrl] = useState('');
 		const [headers, setHeaders] = useState([]);
@@ -36,10 +38,23 @@
 		const [isLoading, setIsLoading] = useState(false);
 		const [manualRedirect, setManualRedirect] = useState(false);
 		const [useProxy, setUseProxy] = useState(true);
-		const [copyInfo, setCopyInfo] = useState({message:'', anchor:null}); // *** BUG修复：状态升级
+		const [copyInfo, setCopyInfo] = useState({message:'', anchor:null});
 		const [selectedExample, setSelectedExample] = useState('');
+		const [proxyOrigin, setProxyOrigin] = useState(window.location.origin);
+		const [requestDuration, setRequestDuration] = useState(null);
 
-		// --- 数据和工具函数 (与原版完全相同) ---
+		// --- 数据和工具函数 ---
+		const proxyOrigins = [
+			window.location.origin, // 本地代理源
+			'https://vh-proxy.deno.dev',
+			'https://proxy.viocha.top',
+			'https://vh-proxy.netlify.app',
+			'https://vh-proxy.pages.dev',
+			'https://p-proxy.viocha.top',
+			'https://w-proxy.viocha.top',
+		];
+		const PROXY_PATH = '/api/proxy';
+
 		const exampleRequests = [
 			{
 				name:'GET 示例 (httpbin.org/get)',
@@ -118,6 +133,7 @@
 			setBinaryFile(null);
 			setManualRedirect(manualRedirect);
 			setResponse('示例已加载。配置完成后，请点击“发送请求”。');
+			setRequestDuration(null);
 		}, []);
 
 		useEffect(()=>{ loadExample(exampleRequests[0].name); }, []);
@@ -176,7 +192,7 @@
 			if (autoContentType && !hasUserContentType){ requestHeaders.set('Content-Type', autoContentType); }
 			requestHeaders.forEach((value, key)=>{ headersObject[key] = value; });
 			if (useProxyForCopy){
-				fetchUrl = `${window.location.origin}/api/proxy`;
+				fetchUrl = `${proxyOrigin}${PROXY_PATH}`;
 				const proxyHeaders = {...headersObject};
 				proxyHeaders['X-Url'] = url;
 				proxyHeaders['X-Method'] = method;
@@ -204,6 +220,9 @@
 		const handleSendRequest = async()=>{
 			setIsLoading(true);
 			setResponse('请求中...');
+			setRequestDuration(null);
+			const startTime = performance.now();
+
 			if (!url){
 				setResponse('错误: 目标 URL 不能为空。');
 				setIsLoading(false);
@@ -262,12 +281,12 @@
 				let fetchUrl;
 				let fetchOptions;
 				if (useProxy){
+					fetchUrl = `${proxyOrigin}${PROXY_PATH}`;
 					const proxyHeaders = new Headers();
 					proxyHeaders.set('X-Url', url);
 					proxyHeaders.set('X-Method', method);
 					if (manualRedirect){ proxyHeaders.set('X-Redirect', 'manual'); }
 					requestHeaders.forEach((value, key)=>{ proxyHeaders.set(key, value); });
-					fetchUrl = '/api/proxy';
 					fetchOptions = {method:'POST', headers:proxyHeaders, body:bodyToSend, redirect:'manual'};
 				} else {
 					fetchUrl = url;
@@ -302,6 +321,8 @@
 				}
 				setResponse(errorMessage);
 			} finally {
+				const endTime = performance.now();
+				setRequestDuration(endTime - startTime);
 				setIsLoading(false);
 			}
 		};
@@ -314,12 +335,24 @@
 							HTTP 代理工具
 						</Typography>
 						<Paper elevation={2} className="p-4">
-							<FormControl fullWidth>
-								<InputLabel>加载预设示例</InputLabel>
-								<Select value={selectedExample} label="加载预设示例" onChange={(e)=>loadExample(e.target.value)}>
-									{exampleRequests.map(ex=>(<MenuItem key={ex.name} value={ex.name}>{ex.name}</MenuItem>))}
-								</Select>
-							</FormControl>
+							<Stack spacing={3}>
+								<FormControl fullWidth>
+									<InputLabel>加载预设示例</InputLabel>
+									<Select value={selectedExample} label="加载预设示例" onChange={(e)=>loadExample(e.target.value)}>
+										{exampleRequests.map(ex=>(<MenuItem key={ex.name} value={ex.name}>{ex.name}</MenuItem>))}
+									</Select>
+								</FormControl>
+								<FormControl fullWidth disabled={!useProxy}>
+									<InputLabel>选择代理服务器</InputLabel>
+									<Select value={proxyOrigin} label="选择代理服务器" onChange={(e)=>setProxyOrigin(e.target.value)}>
+										{proxyOrigins.map((origin, index)=>(
+												<MenuItem key={origin} value={origin}>
+													{index === 0 ? `${origin} (当前源)` : origin}
+												</MenuItem>
+										))}
+									</Select>
+								</FormControl>
+							</Stack>
 						</Paper>
 						<Paper elevation={2} className="p-4">
 							<Stack spacing={4}>
@@ -348,10 +381,22 @@
 							</Stack>
 						</Paper>
 						<Box>
-							<Typography variant="h5" component="h2" className="mb-2 font-semibold">响应结果:</Typography>
-							<Paper variant="outlined" className="bg-gray-900">
+							<Stack direction="row" justifyContent="space-between" alignItems="center" className="mb-2">
+								<Typography variant="h5" component="h2" className="font-semibold">响应结果:</Typography>
+								{requestDuration !== null && (
+										<Chip
+												icon={<AccessTime/>}
+												label={`客户端耗时: ${Math.round(requestDuration)} ms`}
+												color="primary"
+												variant="outlined"
+												size="small"
+										/>
+								)}
+							</Stack>
+							{/* *** 小改进: 添加 min-h-56 flex 防止布局跳动, 并用 w-full 让 pre 填满空间 *** */}
+							<Paper variant="outlined" className="bg-gray-900 min-h-56 flex">
 								<pre
-										className="text-green-300 p-4 overflow-x-auto text-sm whitespace-pre-wrap break-all font-mono">
+										className="text-green-300 p-4 overflow-x-auto text-sm whitespace-pre-wrap break-all font-mono w-full">
 									{response}
 								</pre>
 							</Paper>
@@ -362,7 +407,7 @@
 	}
 
 	// ==================================
-	// 子组件
+	// 子组件 (无需修改)
 	// ==================================
 	function RequestUrlBar({method, setMethod, url, setUrl}){
 		return (
@@ -481,7 +526,6 @@
 	function ActionButtons({isLoading, handleSendRequest, handleCopyAsFetch, copyInfo}){
 		return (
 				<Stack direction="row" spacing={2} alignItems="stretch" className="pt-4">
-					{/* *** BUG修复: 外层Box负责占据剩余空间, 内部Button填满Box *** */}
 					<Box sx={{flexGrow:1}}>
 						<Button
 								variant="contained" color="primary" fullWidth onClick={handleSendRequest} disabled={isLoading}
@@ -491,8 +535,6 @@
 							{isLoading? '发送中...': '发送请求'}
 						</Button>
 					</Box>
-
-					{/* *** BUG修复: 每个按钮都有自己的相对定位父级, 以便提示消息正确定位 *** */}
 					<Box className="relative">
 						<Button
 								variant="outlined" color="secondary" onClick={()=>handleCopyAsFetch(false)} disabled={isLoading}
@@ -508,7 +550,6 @@
 								</span>
 						)}
 					</Box>
-
 					<Box className="relative">
 						<Button
 								variant="outlined" color="secondary" onClick={()=>handleCopyAsFetch(true)} disabled={isLoading}
