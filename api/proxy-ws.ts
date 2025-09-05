@@ -1,10 +1,7 @@
-// functions/api/proxy-ws.ts
+// /api/proxy-ws.ts
 
 // 不检查 ts 错误
 // @ts-nocheck
-
-// 假设您有这个工具函数
-import { genCorsHeaders } from './_lib/util.js';
 
 interface ActiveFetch {
 	controller: AbortController;
@@ -13,18 +10,6 @@ interface ActiveFetch {
 
 // 这个函数现在是 Worker 的默认导出
 export default async function handler(request: Request): Promise<Response> {
-	// --- 新增：处理 CORS 预检请求 ---
-	// 当浏览器跨域发起 WebSocket 连接时，会先发送一个 OPTIONS 请求。
-	// 我们必须正确响应这个请求，否则浏览器会阻止后续的连接。
-	if (request.method === 'OPTIONS') {
-		const corsHeaders = genCorsHeaders({ request, allowMethods: 'GET, OPTIONS' });
-		// 返回 204 No Content 状态码，并附上 CORS 头部，这是标准做法。
-		return new Response(null, { status: 204, headers: corsHeaders });
-	}
-	// --- 新增逻辑结束 ---
-
-
-	// --- 以下是您原有的代码，保持不变 ---
 	const upgradeHeader = request.headers.get('Upgrade');
 	if (upgradeHeader !== 'websocket') {
 		return new Response('Expected Upgrade: websocket', { status: 426 });
@@ -165,11 +150,8 @@ export default async function handler(request: Request): Promise<Response> {
 		activeFetches.clear();
 	});
 
-	// 这一部分也保持不变，在 101 响应中包含 CORS 头部是正确的
-	const corsHeaders = genCorsHeaders({ request, allowMethods: 'GET, OPTIONS' });
 	return new Response(null, {
 		status: 101,
 		webSocket: client,
-		headers: corsHeaders,
 	});
 }

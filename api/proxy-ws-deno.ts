@@ -1,7 +1,6 @@
 // @ts-nocheck
 
-// 您的工具函数可以保留，但在这个 handler 中不会被用来修改升级响应
-import { genCorsHeaders } from "./_lib/util.js";
+// 移除了 genCorsHeaders 的导入
 
 interface ActiveFetch {
 	controller: AbortController;
@@ -9,11 +8,8 @@ interface ActiveFetch {
 }
 
 export default async function handler(request: Request): Promise<Response> {
-	// 如果是 CORS 预检请求，正常处理并返回
-	if (request.method === "OPTIONS") {
-		const corsHeaders = genCorsHeaders({ request, allowMethods: "GET, OPTIONS" });
-		return new Response(null, { headers: corsHeaders });
-	}
+	// --- 已移除：处理 CORS 预检请求的整个 if (request.method === 'OPTIONS') 块 ---
+	// WebSocket 连接不使用 OPTIONS 预检，所以这段逻辑是不需要的。
 
 	const upgradeHeader = request.headers.get("Upgrade");
 	if (upgradeHeader !== "websocket") {
@@ -167,8 +163,7 @@ export default async function handler(request: Request): Promise<Response> {
 		activeFetches.clear();
 	});
 
-	// *** 关键修正 ***
 	// 直接返回从 Deno.upgradeWebSocket 获取的原始 response 对象。
-	// 不要以任何方式修改它或用它来创建新的 Response。
+	// 这是 Deno 平台的标准做法，这个 response 已经包含了正确的 101 响应头。
 	return response;
 }
