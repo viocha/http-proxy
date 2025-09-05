@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
-<title>HTTP Proxy 工具 (增强版 v2.1)</title>
+<title>HTTP Proxy 工具</title>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -57,9 +57,9 @@
 
 		const exampleRequests = [
 			{
-				name:'GET 示例 (httpbin.org/get)',
+				name:'GET 示例 (GitHub raw)',
 				method:'GET',
-				url:'https://httpbin.org/get',
+				url:'https://github.com/facebook/react/raw/refs/heads/main/README.md',
 				headers:[{name:'Accept', value:'application/json'}],
 				bodyType:'none', jsonBody:'', formBody:[], multipartBody:[], binaryFile:null,
 			},
