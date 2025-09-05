@@ -56,7 +56,7 @@ export default async function handler(req: Request): Promise<Response> {
 			headers.delete('Content-Length'); // content-length和body长度不匹配fetch会报错
 		} else {
 			if (req.body) {
-				body = await req.arrayBuffer(); // 防止fetch重定向导致错误
+				body = req.body;
 			}
 		}
 
