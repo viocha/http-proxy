@@ -3,6 +3,8 @@ functions
 deno-deploy-entry.ts
 _worker.js
 .wrangler
+bin
+pkg
 
 ### Node template
 # Logs

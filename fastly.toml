@@ -1,0 +1,15 @@
+# This file describes a Fastly Compute package. To learn more visit:
+# https://www.fastly.com/documentation/reference/compute/fastly-toml
+
+authors = ["<viocha@qq.com>"]
+description = "An HTTP proxy server using Fastly Compute@Edge"
+language = "javascript"
+manifest_version = 3
+name = "proxy"
+service_id = "B5gexwmOxBE8k8gQkDZiri"
+
+[local_server]
+
+[scripts]
+  build = "pnpm run build-fastly"
+  post_init = "pnpm install"
