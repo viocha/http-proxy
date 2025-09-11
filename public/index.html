@@ -47,6 +47,7 @@
 		const proxyOrigins = [
 			window.location.origin, // 本地代理源
 			'https://vh-proxy.deno.dev',
+			'https://vh-proxy.zeabur.dev',
 			'https://proxy.viocha.top',
 			'https://vh-proxy.netlify.app',
 			'https://vh-proxy.pages.dev',
@@ -57,14 +58,28 @@
 
 		const exampleRequests = [
 			{
-				name:'GET 示例 (GitHub raw)',
+				name:'GET - GitHub raw',
 				method:'GET',
 				url:'https://github.com/facebook/react/raw/refs/heads/main/README.md',
 				headers:[{name:'Accept', value:'application/json'}],
 				bodyType:'none', jsonBody:'', formBody:[], multipartBody:[], binaryFile:null,
 			},
 			{
-				name:'JSON POST 示例 (httpbin.org/post)',
+				name:'GET - 100MB file',
+				method:'GET',
+				url:'https://sin-speed.hetzner.com/100MB.bin',
+				headers:[],
+				bodyType:'none', jsonBody:'', formBody:[], multipartBody:[], binaryFile:null,
+			},
+			{
+				name:'GET - 1GB file',
+				method:'GET',
+				url:'https://sin-speed.hetzner.com/1GB.bin',
+				headers:[],
+				bodyType:'none', jsonBody:'', formBody:[], multipartBody:[], binaryFile:null,
+			},
+			{
+				name:'POST JSON - httpbin.org/post',
 				method:'POST',
 				url:'https://httpbin.org/post',
 				headers:[{name:'X-Custom-Header', value:'ReactProxyTest'}],
@@ -73,7 +88,7 @@
 				formBody:[], multipartBody:[], binaryFile:null,
 			},
 			{
-				name:'Form POST 示例 (httpbin.org/post)',
+				name:'POST Form - httpbin.org/post',
 				method:'POST',
 				url:'https://httpbin.org/post',
 				headers:[],
@@ -82,7 +97,7 @@
 				jsonBody:'', multipartBody:[], binaryFile:null,
 			},
 			{
-				name:'Multipart POST 示例 (httpbin.org/post)',
+				name:'POST Multipart - httpbin.org/post',
 				method:'POST',
 				url:'https://httpbin.org/post',
 				headers:[],
@@ -94,7 +109,7 @@
 				jsonBody:'', formBody:[], binaryFile:null,
 			},
 			{
-				name:'Binary File POST 示例 (httpbin.org/post)',
+				name:'POST Binary File - httpbin.org/post',
 				method:'POST',
 				url:'https://httpbin.org/post',
 				headers:[],
@@ -103,7 +118,7 @@
 				jsonBody:'', formBody:[], multipartBody:[],
 			},
 			{
-				name:'手动重定向 GET 示例 (httpbin.org/redirect-to)',
+				name:'GET 手动重定向 - httpbin.org/redirect-to',
 				method:'GET',
 				url:'https://httpbin.org/redirect-to?url=https://example.com',
 				headers:[],
