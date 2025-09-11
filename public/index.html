@@ -312,11 +312,15 @@
 				res.headers.forEach((value, key)=>{ responseHeaders[key] = value; });
 				let responseBodyContent;
 				const respContentType = res.headers.get('content-type');
-				if (respContentType?.includes('application/json')){
-					responseBodyContent = await res.json();
-				} else if (respContentType?.includes('text/') || respContentType?.includes('application/xml')
-						|| respContentType?.includes('application/javascript')){
+				if (respContentType?.includes('text/') ||
+						respContentType?.includes('application/json') ||
+						respContentType?.includes('application/xml') ||
+						respContentType?.includes('application/javascript')){
 					responseBodyContent = await res.text();
+					// 过长则截断
+					if (responseBodyContent.length > 10000){
+						responseBodyContent = responseBodyContent.slice(0, 10000) + `\n\n...[响应体长度为 ${responseBodyContent.length}，已截断]`;
+					}
 				} else if (res.body){
 					try {
 						const blob = await res.blob();
@@ -411,7 +415,7 @@
 							{/* *** 小改进: 添加 min-h flex 防止布局跳动, 并用 w-full 让 pre 填满空间 *** */}
 							<Paper variant="outlined" className="bg-gray-900 min-h-[80vh] flex">
 								<pre
-										className="text-green-300 p-4 overflow-x-auto text-sm whitespace-pre-wrap break-all font-mono w-full">
+										className="text-green-500 p-4 overflow-x-auto text-sm whitespace-pre-wrap break-all font-mono w-full">
 									{response}
 								</pre>
 							</Paper>
