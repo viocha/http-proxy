@@ -34,7 +34,7 @@
 		const [formBody, setFormBody] = useState([]);
 		const [multipartBody, setMultipartBody] = useState([]);
 		const [binaryFile, setBinaryFile] = useState(null);
-		const [response, setResponse] = useState('');
+		const [response, setResponse] = useState(null);
 		const [isLoading, setIsLoading] = useState(false);
 		const [manualRedirect, setManualRedirect] = useState(false);
 		const [useProxy, setUseProxy] = useState(true);
@@ -129,6 +129,11 @@
 		];
 
 		const genId = ()=>Date.now()+Math.random();
+
+
+		function formatTime(duration){
+			return  duration<1000? `${duration.toFixed(0)}ms`: `${(duration/1000).toFixed(2)}s`;
+		}
 
 		const loadExample = useCallback((exampleName)=>{
 			const example = exampleRequests.find(ex=>ex.name===exampleName);
@@ -317,9 +322,18 @@
 						respContentType?.includes('application/xml') ||
 						respContentType?.includes('application/javascript')){
 					responseBodyContent = await res.text();
+
 					// 过长则截断
-					if (responseBodyContent.length > 10000){
-						responseBodyContent = responseBodyContent.slice(0, 10000) + `\n\n...[响应体长度为 ${responseBodyContent.length}，已截断]`;
+					if (responseBodyContent.length>5000){
+						responseBodyContent = responseBodyContent.slice(0, 5000)+
+								`\n\n...[已截断，响应体长度为 ${responseBodyContent.length}]`;
+					} else if (respContentType.includes('application/json')){ // 尝试格式化 JSON
+						try {
+							const parsed = JSON.parse(responseBodyContent);
+							responseBodyContent = JSON.stringify(parsed, null, 2);
+						} catch (e){
+							// 忽略解析错误，保持原始文本
+						}
 					}
 				} else if (res.body){
 					try {
@@ -332,7 +346,7 @@
 					responseBodyContent = '[No response body]';
 				}
 				const result = {status:res.status, statusText:res.statusText, headers:responseHeaders, body:responseBodyContent};
-				setResponse(JSON.stringify(result, null, 2));
+				setResponse(result);
 			} catch (err){
 				let errorMessage = '请求失败:\n'+(err.message || String(err));
 				if (!useProxy && err.name==='TypeError' && err.message.includes('Failed to fetch')){
@@ -405,19 +419,40 @@
 								{requestDuration !== null && (
 										<Chip
 												icon={<AccessTime/>}
-												label={`客户端耗时: ${Math.round(requestDuration)} ms`}
+												label={`客户端耗时: ${formatTime(requestDuration)}`}
 												color="primary"
 												variant="outlined"
 												size="small"
 										/>
 								)}
 							</Stack>
-							{/* *** 小改进: 添加 min-h flex 防止布局跳动, 并用 w-full 让 pre 填满空间 *** */}
-							<Paper variant="outlined" className="bg-gray-900 min-h-[80vh] flex">
-								<pre
-										className="text-green-500 p-4 overflow-x-auto text-sm whitespace-pre-wrap break-all font-mono w-full">
-									{response}
-								</pre>
+							<Paper variant="outlined" className="bg-gray-900 text-white p-4 font-mono text-sm min-h-[80vh]">
+								{response && typeof response === 'object' ? (
+										// Structured success response
+										<div>
+											<p>
+												<span
+														className={`font-bold ${response.status >= 400 ? 'text-red-400' : 'text-green-400'}`}>
+													Status:
+												</span>
+												<span className="ml-2">{response.status} {response.statusText}</span>
+											</p>
+											<p className="mt-4 font-bold text-yellow-400">Headers:</p>
+											<pre className="whitespace-pre-wrap break-all mt-1">
+												{JSON.stringify(response.headers, null, 2)}
+											</pre>
+											<p className="mt-4 font-bold text-cyan-400">Body:</p>
+											<pre className="whitespace-pre-wrap break-all mt-1">
+												{response.body}
+											</pre>
+										</div>
+								) : (
+										 // Fallback for strings (info, loading, error messages)
+										 <pre
+												 className={`whitespace-pre-wrap break-all ${response && (response.includes('错误') || response.includes('失败')) ? 'text-red-400' : 'text-gray-400'}`}>
+											{response}
+										</pre>
+								 )}
 							</Paper>
 						</Box>
 					</Stack>
