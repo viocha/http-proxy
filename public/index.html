@@ -79,6 +79,21 @@
 				url:'https://test.ipw.cn',
 			},
 			{
+				name:'GET - IP info (ipinfo.io)',
+				method:'GET',
+				url:'https://ipinfo.io/json',
+			},
+			{
+				name:'GET - IP info (ipwho.is)',
+				method:'GET',
+				url:'https://ipwho.is',
+			},
+			{
+				name:'GET - IP info (ip-api.com)',
+				method:'GET',
+				url:'http://ip-api.com/json',
+			},
+			{
 				name:'GET - 100MB file',
 				method:'GET',
 				url:'https://sin-speed.hetzner.com/100MB.bin',
@@ -324,8 +339,8 @@
 					responseBodyContent = await res.text();
 
 					// 过长则截断
-					if (responseBodyContent.length>5000){
-						responseBodyContent = responseBodyContent.slice(0, 5000)+
+					if (responseBodyContent.length>10000){
+						responseBodyContent = responseBodyContent.slice(0, 10000)+
 								`\n\n...[已截断，响应体长度为 ${responseBodyContent.length}]`;
 					} else if (respContentType.includes('application/json')){ // 尝试格式化 JSON
 						try {
