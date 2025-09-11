@@ -90,8 +90,9 @@ export default async function handler(req: Request): Promise<Response> {
 		if (redirect === 'manual' && response.status >= 300 && response.status < 400) {
 			respHeaders.set('X-Redirect-Status', String(response.status));
 			respHeaders.set('X-Redirect-Location', response.headers.get('Location') || '');
-			return new Response(null, {
+			return new Response(response.body, {
 				status: 200,
+				statusText:'OK - Redirect',
 				headers: respHeaders,
 			});
 		}
@@ -99,12 +100,14 @@ export default async function handler(req: Request): Promise<Response> {
 		// 返回最终的响应
 		return new Response(response.body, {
 			status: response.status,
+			statusText: response.statusText,
 			headers: respHeaders,
 		});
 	} catch (error: any) {
 		console.error('Proxy error:', error);
 		return Response.json({error: 'Proxy error: ' + error.message}, {
 			status: 500,
+			statusText: 'Proxy Internal Server Error',
 			headers: corsHeaders,
 		});
 	}
