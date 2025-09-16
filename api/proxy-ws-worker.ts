@@ -1,4 +1,4 @@
-// /api/proxy-ws.ts
+// /api/proxy-ws-worker.ts
 
 // 不检查 ts 错误
 // @ts-nocheck

@@ -30,7 +30,7 @@ jobs:
         uses: denoland/deployctl@v1
         with:
           project: "vh-proxy"
-          entrypoint: "deno-deploy-entry.ts"
+          entrypoint: "main-deno.ts"
           root: ""
 
 

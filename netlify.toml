@@ -1,4 +1,7 @@
-[build]
-command = "node build-netlify.js"
-edge_functions = "/api"
+# netlify.toml
 
+[[edge_functions]]
+# 将所有 /api/ 开头的请求都路由到这个 Edge Function
+path = "/api/*"
+# 指定 Edge Function 的入口文件
+function = "index" # "index" 对应 netlify/edge-functions/index.ts

@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "dev": "deno run -A --sloppy-imports main-deno.ts",
+		"build-deno": "deno run -A scripts/build-deno.ts"
+  },
+	"imports": {
+    "hono": "npm:hono"
+  }
+}
