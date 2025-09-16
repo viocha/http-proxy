@@ -62,9 +62,6 @@ export default async function handler(req: Request): Promise<Response> {
 			if (key.toLowerCase().startsWith('x-forwarded-')) {
 				headers.delete(key);
 			}
-			if (key.toLowerCase().startsWith('x-vercel-')) {
-				headers.delete(key);
-			}
 		}
 		headers.delete('x-real-ip');
 
@@ -77,7 +74,7 @@ export default async function handler(req: Request): Promise<Response> {
 
 		// 先复制目标服务器的响应头，然后应用代理服务器的 CORS 策略
 		const respHeaders = new Headers(response.headers);
-		respHeaders.delete('content-encoding');
+		respHeaders.delete('content-encoding'); // 解决 hono 框架的问题：ERR_CONTENT_DECODING_FAILED
 		Object.entries(corsHeaders).forEach(([key, value]) => {
 			respHeaders.set(key, value);
 		});

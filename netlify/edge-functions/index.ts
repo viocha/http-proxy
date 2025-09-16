@@ -1,4 +1,6 @@
-import {Hono} from 'hono';
+// import {Hono} from 'hono';
+import { Hono } from 'jsr:@hono/hono'
+import { handle } from 'jsr:@hono/hono/netlify'
 import proxyHandler from '../../routes/proxy.js';
 import getHandler from '../../routes/get.js';
 
@@ -11,4 +13,4 @@ app.get('/api/get', (c)=>{
 	return getHandler(c.req.raw);
 });
 
-export default app.fetch;
+export default handle(app);
