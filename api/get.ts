@@ -2,6 +2,10 @@
 
 import {genCorsHeaders} from './_lib/util.js';
 
+export const config ={
+	path: '/api/get', // 适配netlify
+}
+
 export default async function handler(req: Request): Promise<Response> {
 	const corsHeaders: Record<string, string> = genCorsHeaders(
 			{request: req, allowMethods: 'GET, OPTIONS'},
