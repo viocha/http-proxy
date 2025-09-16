@@ -2,11 +2,6 @@
 
 import {genCorsHeaders} from './_lib/util.js';
 
-export const config = {
-	runtime: 'edge', // 指定这是一个 Edge Function
-	path: '/api/get',
-};
-
 export default async function handler(req: Request): Promise<Response> {
 	const corsHeaders: Record<string, string> = genCorsHeaders(
 			{request: req, allowMethods: 'GET, OPTIONS'},

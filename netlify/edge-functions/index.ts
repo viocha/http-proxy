@@ -1,4 +1,4 @@
-import {Hono} from 'jsr:@hono/hono';
+import {Hono} from 'hono';
 import proxyHandler from '../../routes/proxy.js';
 import getHandler from '../../routes/get.js';
 

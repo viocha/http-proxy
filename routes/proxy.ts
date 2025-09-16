@@ -2,11 +2,6 @@
 
 import {genCorsHeaders} from './_lib/util.js';
 
-export const config = {
-	runtime: 'edge', // 指定这是一个 Edge Function
-	path: '/api/proxy',
-};
-
 export default async function handler(req: Request): Promise<Response> {
 	const corsHeaders: Record<string, string> = genCorsHeaders(
 			{request: req, allowMethods: 'POST, OPTIONS'},
@@ -82,6 +77,7 @@ export default async function handler(req: Request): Promise<Response> {
 
 		// 先复制目标服务器的响应头，然后应用代理服务器的 CORS 策略
 		const respHeaders = new Headers(response.headers);
+		respHeaders.delete('content-encoding');
 		Object.entries(corsHeaders).forEach(([key, value]) => {
 			respHeaders.set(key, value);
 		});
