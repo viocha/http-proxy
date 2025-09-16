@@ -1,6 +1,6 @@
 # wrangler.toml
 name = "proxy"
-main = "main-worker.js"
+main = "main-worker.ts"
 compatibility_date = "2025-09-01"
 
 [assets]
