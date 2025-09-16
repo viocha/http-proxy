@@ -1,6 +1,6 @@
 import {Hono} from 'hono';
-import proxyHandler from './routes/proxy.js';
-import getHandler from './routes/get.js';
+import proxyHandler from './api/proxy.js';
+import getHandler from './api/get.js';
 
 const app = new Hono();
 

@@ -1,6 +1,6 @@
 import {Hono} from 'hono';
-import proxyHandler from './routes/proxy.js';
-import getHandler from './routes/get.js';
+import proxyHandler from './api/proxy.js';
+import getHandler from './api/get.js';
 import {serve} from '@hono/node-server';
 import {serveStatic} from '@hono/node-server/serve-static';
 

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import {Hono} from 'hono';
-import proxyHandler from './routes/proxy.ts';
-import getHandler from './routes/get.ts';
+import proxyHandler from './api/proxy.ts';
+import getHandler from './api/get.ts';
 import {serveStatic} from '@hono/node-server/serve-static';
 
 const app = new Hono();
