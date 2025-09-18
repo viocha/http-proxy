@@ -27,5 +27,5 @@ serve({
 });
 
 console.log(
-		`🚀 Hono server running at http${cert && key ? 's' : ''}://localhost:${PORT}`,
+		`🚀 Hono server running at http${SSL ? 's' : ''}://localhost:${PORT}`,
 );
