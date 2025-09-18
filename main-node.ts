@@ -11,7 +11,9 @@ app.all('/api/get', (c) => getHandler(c.req.raw));
 
 app.get('/*', serveStatic({root: './public'}));
 
+const PORT = Number(process.env.PORT) || 8000;
+
 serve({
 	fetch: app.fetch,
-	port:8000,
-})
+	port: PORT,
+});
