@@ -5,8 +5,7 @@
   "scripts": {
     "vercel-dev": "vercel dev --debug",
     "build": "pnpm tsc",
-    "start": "node dist/main-node.js",
-    "start-ssl": "PORT=443 SSL=true pnpm start"
+    "start": "node dist/main-node.js"
   },
   "packageManager": "pnpm@10.12.2",
   "dependencies": {
