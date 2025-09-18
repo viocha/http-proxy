@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "vercel-dev": "vercel dev --debug"
+    "vercel-dev": "vercel dev --debug",
+    "start": "pnpm tsc && node dist/main-node.js"
   },
   "packageManager": "pnpm@10.12.2",
   "dependencies": {
